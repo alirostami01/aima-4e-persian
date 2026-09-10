@@ -1,0 +1,97 @@
+name: Externalize HTML images
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  externalize:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Replace base64 images with matching chapter files
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import base64
+          import hashlib
+          import re
+
+          ROOT = Path('.')
+          IMG_RE = re.compile(r'''(?P<prefix><img\b[^>]*?\bsrc=["'])(?P<src>data:image/[^;]+;base64,[^"']*)(?P<suffix>["'])''', re.IGNORECASE)
+
+          def digest(data: bytes) -> str:
+              return hashlib.sha256(data).hexdigest()
+
+          total = 0
+          changed_files = 0
+
+          for html in sorted(ROOT.glob('??-فصل*.html')):
+              m = re.match(r'^(\d{2})-', html.name)
+              if not m:
+                  continue
+              ch = int(m.group(1))
+              if not 1 <= ch <= 26:
+                  continue
+
+              figure_dir = ROOT / 'figures' / f'ch{ch:02d}'
+              if not figure_dir.is_dir():
+                  raise SystemExit(f'{html}: missing {figure_dir}')
+
+              image_map = {}
+              for image in figure_dir.iterdir():
+                  if image.is_file() and image.suffix.lower() in {'.jpg', '.jpeg', '.png', '.webp'}:
+                      image_map[digest(image.read_bytes())] = image.name
+
+              text = html.read_text(encoding='utf-8')
+              matches = list(IMG_RE.finditer(text))
+              if not matches:
+                  continue
+
+              out = []
+              pos = 0
+              for match in matches:
+                  encoded = match.group('src').split(',', 1)[1]
+                  try:
+                      data = base64.b64decode(encoded, validate=True)
+                  except Exception as exc:
+                      raise SystemExit(f'{html}: invalid base64 image: {exc}')
+
+                  name = image_map.get(digest(data))
+                  if name is None:
+                      raise SystemExit(f'{html}: embedded image has no matching file in {figure_dir}')
+
+                  out.append(text[pos:match.start()])
+                  out.append(match.group('prefix') + f'figures/ch{ch:02d}/{name}' + match.group('suffix'))
+                  pos = match.end()
+
+              out.append(text[pos:])
+              new_text = ''.join(out)
+
+              if new_text != text:
+                  html.write_text(new_text, encoding='utf-8')
+                  changed_files += 1
+                  total += len(matches)
+                  print(f'{html}: externalized {len(matches)} images')
+
+          print(f'Changed {changed_files} HTML files; externalized {total} images.')
+          PY
+
+      - name: Commit changes and remove one-time workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add '*.html' .github/workflows/externalize-html-images.yml
+          git rm -f .github/workflows/externalize-html-images.yml
+          if git diff --cached --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git commit -m 'refactor: replace base64 HTML images with chapter paths [skip ci]'
+          git push
