@@ -247,14 +247,14 @@
 <figure class="fig"><img src="figures/ch03/fig-3-7.jpg" alt="شکل 3.7"><figcaption><strong>شکل ۳.۷ — الگوریتم جستجوی بهترین-اول، و تابع گسترش یک گره.</strong> ساختارهای دادهٔ به‌کاررفته در این‌جا در بخش 3.3.2 توصیف شده‌اند. برای <span class="en-inline">yield</span> به پیوست ب مراجعه کنید.</figcaption></figure>
 <pre class="code"><code>function BEST-FIRST-SEARCH(problem, f) returns a solution node or failure
   node ← NODE(STATE=problem.INITIAL)
-  frontier ← یک صف اولویت‌دار مرتب‌شده با f، با node به‌عنوان یک عنصر
-  reached ← یک جدول جست‌وجو، با یک مدخل با کلید problem.INITIAL و مقدار node
+  frontier ← a priority queue ordered by f, with node as an element
+  reached ← a lookup table, with one entry keyed by problem.INITIAL and value node
   while not IS-EMPTY(frontier) do
     node ← POP(frontier)
     if problem.IS-GOAL(node.STATE) then return node
     for each child in EXPAND(problem, node) do
       s ← child.STATE
-      if s در reached نیست or child.PATH-COST &lt; reached[s].PATH-COST then
+      if s is not in reached or child.PATH-COST &lt; reached[s].PATH-COST then
         reached[s] ← child
         add child to frontier
   return failure
@@ -324,20 +324,17 @@ function EXPAND(problem, node) yields nodes
 <pre class="code"><code>function BREADTH-FIRST-SEARCH(problem) returns a solution node or failure
   node ← NODE(problem.INITIAL)
   if problem.IS-GOAL(node.STATE) then return node
-  frontier ← یک صف FIFO، با node به‌عنوان یک عنصر
+  frontier ← a FIFO queue, with node as an element
   reached ← {problem.INITIAL}
   while not IS-EMPTY(frontier) do
     node ← POP(frontier)
     for each child in EXPAND(problem, node) do
       s ← child.STATE
       if problem.IS-GOAL(s) then return child
-      if s در reached نیست then
+      if s is not in reached then
         add s to reached
         add child to frontier
-  return failure
-
-function UNIFORM-COST-SEARCH(problem) returns a solution node, or failure
-  return BEST-FIRST-SEARCH(problem, PATH-COST)</code></pre>
+  return failure</code></pre>
 <h3>3.4.2 الگوریتم دیکسترا یا جستجوی هزینه-یکنواخت</h3>
 <p>وقتی کنش‌ها هزینه‌های متفاوت دارند، انتخاب بدیهی به‌کارگیری جستجوی بهترین-اول با تابع ارزیابیِ هزینهٔ مسیر از ریشه تا گرهٔ کنونی است. این را جامعهٔ علوم رایانهٔ نظری «الگوریتم دیکسترا» و جامعهٔ هوش مصنوعی «جستجوی هزینه-یکنواخت» (Uniform-Cost Search) می‌نامد. ایده این است که جستجوی سطح-اول در موج‌هایی با عمق یکنواخت پخش می‌شود — نخست عمق ۱، سپس عمق ۲ و الی آخر — حال آنکه جستجوی هزینه-یکنواخت در موج‌هایی با هزینهٔ مسیر یکنواخت پخش می‌شود. الگوریتم را می‌توان به‌صورت فراخوانی <span class="en-inline">BEST-FIRST-SEARCH</span> با <span class="en-inline">PATH-COST</span> به‌عنوان تابع ارزیابی پیاده کرد، چنان‌که در شکل ۳.۹ نشان داده شده.</p>
 <figure class="fig"><img src="figures/ch03/fig-3-10.jpg" alt="شکل 3.10"><figcaption><strong>شکل ۳.۱۰ — بخشی از فضای حالت رومانی، برگزیده برای نشان دادن جستجوی هزینه-یکنواخت.</strong> (شهرها: سیبیو، فاگاراش، پیتشتی، ریمنیکو ویلچا، بخارست)</figcaption></figure>
@@ -361,13 +358,14 @@ function UNIFORM-COST-SEARCH(problem) returns a solution node, or failure
     if result ≠ cutoff then return result
 
 function DEPTH-LIMITED-SEARCH(problem, ℓ) returns a node or failure or cutoff
-  frontier ← یک صف LIFO (پشته) با NODE(problem.INITIAL) به‌عنوان یک عنصر
+  frontier ← a LIFO queue (stack) with NODE(problem.INITIAL) as an element
   result ← failure
   while not IS-EMPTY(frontier) do
     node ← POP(frontier)
     if problem.IS-GOAL(node.STATE) then return node
-    if DEPTH(node) &gt; ℓ then result ← cutoff
-    else if not IS-CYCLE(node) do
+    if DEPTH(node) &gt; ℓ then
+      result ← cutoff
+    else
       for each child in EXPAND(problem, node) do
         add child to frontier
   return result</code></pre>
@@ -382,33 +380,33 @@ function DEPTH-LIMITED-SEARCH(problem, ℓ) returns a node or failure or cutoff
 <p>الگوریتم‌هایی که تاکنون پوشش داده‌ایم از حالت آغازین شروع می‌کنند و می‌توانند به هر یک از حالت‌های هدفِ متعدد برسند. رویکرد جایگزینی به نام جستجوی دوطرفه (Bidirectional Search) به‌طور هم‌زمان از حالت آغازین به جلو و از حالت(های) هدف به عقب جستجو می‌کند، به این امید که دو جستجو به هم برسند. انگیزه آن است که <span class="en-inline">b^(d/2) + b^(d/2)</span> بسیار کمتر از bᵈ است (مثلاً ۵۰٬۰۰۰ برابر کمتر وقتی b = d = 10).</p>
 <figure class="fig"><img src="figures/ch03/fig-3-14.jpg" alt="شکل 3.14"><figcaption><strong>شکل ۳.۱۴ — جستجوی بهترین-اول دوطرفه دو جبهه و دو جدول حالت‌های رسیده نگه می‌دارد.</strong> وقتی مسیری در یک جبهه به حالتی می‌رسد که در نیمهٔ دیگر جستجو نیز رسیده شده، دو مسیر (با تابع JOIN-NODES) به هم می‌پیوندند و راه‌حل می‌سازند. نخستین راه‌حلی که می‌گیریم تضمین‌شده بهترین نیست؛ تابع <span class="en-inline">TERMINATED</span> تعیین می‌کند چه‌وقت جست‌وجوی راه‌حل‌های تازه را متوقف کنیم.</figcaption></figure>
 <pre class="code"><code>function BIBF-SEARCH(problemF, fF, problemB, fB) returns a solution node, or failure
-  nodeF ← NODE(problemF.INITIAL)     // گره برای حالت آغازین
-  nodeB ← NODE(problemB.INITIAL)     // گره برای حالت هدف
-  frontierF ← صف اولویت‌دار مرتب‌شده با fF، با nodeF به‌عنوان عنصر
-  frontierB ← صف اولویت‌دار مرتب‌شده با fB، با nodeB به‌عنوان عنصر
-  reachedF ← جدول جست‌وجو، با یک کلید nodeF.STATE و مقدار nodeF
-  reachedB ← جدول جست‌وجو، با یک کلید nodeB.STATE و مقدار nodeB
-  solution ← failure
-  while not TERMINATED(solution, frontierF, frontierB) do
-    if fF(TOP(frontierF)) &lt; fB(TOP(frontierB)) then
-      solution ← PROCEED(F, problemF, frontierF, reachedF, reachedB, solution)
-    else
-      solution ← PROCEED(B, problemB, frontierB, reachedB, reachedF, solution)
-  return solution
+    nodeF ← NODE(problemF.INITIAL) // Node for a start state
+    nodeB ← NODE(problemB.INITIAL) // Node for a goal state
+    frontierF ← a priority queue ordered by fF, with nodeF as an element
+    frontierB ← a priority queue ordered by fB, with nodeB as an element
+    reachedF ← a lookup table, with one key nodeF.STATE and value nodeF
+    reachedB ← a lookup table, with one key nodeB.STATE and value nodeB
+    solution ← failure
+    while not TERMINATED(solution, frontierF, frontierB) do
+        if fF(TOP(frontierF)) &lt; fB(TOP(frontierB)) then
+            solution ← PROCEED(F, problemF, frontierF, reachedF, reachedB, solution)
+        else solution ← PROCEED(B, problemB, frontierB, reachedB, reachedF, solution)
+    return solution
 
 function PROCEED(dir, problem, frontier, reached, reached2, solution) returns a solution
-  // گره را روی جبهه گسترش بده؛ در برابر جبههٔ دیگر در reached2 بررسی کن.
-  // متغیر &quot;dir&quot; جهت است: یا F برای جلو یا B برای عقب.
-  node ← POP(frontier)
-  for each child in EXPAND(problem, node) do
-    s ← child.STATE
-    if s در reached نیست or PATH-COST(child) &lt; PATH-COST(reached[s]) then
-      reached[s] ← child
-      add child to frontier
-    if s در reached2 است then
-      solution2 ← JOIN-NODES(dir, child, reached2[s])
-      if PATH-COST(solution2) &lt; PATH-COST(solution) then solution ← solution2
-  return solution</code></pre>
+    // Expand node on frontier; check against the other frontier in reached2.
+    // The variable &quot;dir&quot; is the direction: either F for forward or B for backward.
+    node ← POP(frontier)
+    for each child in EXPAND(problem, node) do
+        s ← child.STATE
+        if s not in reached or PATH-COST(child) &lt; PATH-COST(reached[s]) then
+            reached[s] ← child
+            add child to frontier
+            if s is in reached2 then
+                solution2 ← JOIN-NODES(dir, child, reached2[s])
+                if PATH-COST(solution2) &lt; PATH-COST(solution) then
+                    solution ← solution2
+    return solution</code></pre>
 <p>برای اینکه این کار کند، باید دو جبهه و دو جدول حالت‌های رسیده پیگیری کنیم و باید بتوانیم به عقب استدلال کنیم: اگر حالت s′ جانشین s در جهت جلو است، باید بدانیم s جانشین s′ در جهت عقب است. وقتی دو جبهه به هم برخورد کنند راه‌حل داریم.<sup>⁹</sup> نسخه‌های بسیار متفاوتی از جستجوی دوطرفه هست، همان‌گونه که الگوریتم‌های جستجوی یک‌طرفهٔ بسیاری هست. در این بخش جستجوی بهترین-اول دوطرفه را توصیف می‌کنیم.</p>
 <p>هرچند دو جبههٔ جدا هست، گره‌ای که بعدی گسترش می‌یابد همیشه گره‌ای با کمترین مقدار تابع ارزیابی، در هر کدام از جبهه‌ها، است. وقتی تابع ارزیابی هزینهٔ مسیر باشد، جستجوی هزینه-یکنواخت دوطرفه می‌گیریم و اگر هزینهٔ مسیر بهینه C∗ باشد، هیچ گرهی با هزینهٔ بیشتر از C∗/2 گسترش نخواهد یافت. این می‌تواند شتاب قابل توجهی به بار آورد. الگوریتم عمومی جستجوی بهترین-اول دوطرفه در شکل ۳.۱۴ نشان داده شده. دو نسخه از مسئله و تابع ارزیابی را وارد می‌کنیم: یکی در جهت جلو (زیرنویس F) و یکی در جهت عقب (زیرنویس B). وقتی تابع ارزیابی هزینهٔ مسیر است، می‌دانیم نخستین راه‌حلِ یافته‌شده راه‌حل بهینه خواهد بود، اما با توابع ارزیابی متفاوت این لزوماً درست نیست. بنابراین بهترین راه‌حلِ یافته‌شده تاکنون را پیگیری می‌کنیم و ممکن است پیش از آنکه آزمون <span class="en-inline">TERMINATED</span> ثابت کند راه‌حل بهتری باقی نمانده، چند بار به‌روزش کنیم.</p>
 <h3>3.4.6 مقایسهٔ الگوریتم‌های جستجوی نامطلع</h3>
@@ -490,18 +488,18 @@ function PROCEED(dir, problem, frontier, reached, reached2, solution) returns a 
   solution, fvalue ← RBFS(problem, NODE(problem.INITIAL), ∞)
   return solution
 
-function RBFS(problem, node, f limit) returns a solution or failure, and a new f-cost limit
+function RBFS(problem, node, f_limit) returns a solution or failure, and a new f-cost limit
   if problem.IS-GOAL(node.STATE) then return node
   successors ← LIST(EXPAND(node))
-  if successors خالی است then return failure, ∞
-  for each s in successors do     // f را با مقدار جستجوی قبلی به‌روز کن
+  if successors is empty then return failure, ∞
+  for each s in successors do     // update f with value from previous search, if any
     s.f ← max(s.PATH-COST + h(s), node.f)
   while true do
-    best ← گره در successors با کمترین مقدار f
-    if best.f &gt; f limit then return failure, best.f
-    alternative ← دومین کمترین مقدار f میان successors
-    result, best.f ← RBFS(problem, best, min(f limit, alternative))
-    if result ≠ failure then return result, best.f</code></pre>
+    best ← the lowest f-value node in successors
+    if best.f &gt; f_limit then return failure, best.f
+    alternative ← the second-lowest f-value among successors
+    result, best.f ← RBFS(problem, best, min(f_limit, alternative))
+    if result ≠ failure then return result</code></pre>
 <figure class="fig"><img src="figures/ch03/fig-3-23.jpg" alt="شکل 3.23"><figcaption><strong>شکل ۳.۲۳ — مراحل جستجوی RBFS برای کوتاه‌ترین مسیر به بخارست.</strong> مقدار <span class="en-inline">f limit</span> برای هر فراخوانی بازگشتی بالای هر گرهٔ کنونی نشان داده شده و هر گره با هزینهٔ f خود برچسب‌گذاری شده. (الف) مسیر از طریق ریمنیکو ویلچا دنبال می‌شود تا آنکه بهترین برگ کنونی (پیتشتی) مقداری بدتر از بهترین مسیر جایگزین (فاگاراش) داشته باشد. (ب) بازگشت باز می‌شود و بهترین مقدار برگ زیردرخت فراموش‌شده (۴۱۷) به ریمنیکو ویلچا پشتیبان‌گرفته می‌شود؛ سپس فاگاراش گسترش می‌یابد و بهترین مقدار برگ ۴۵۰ را آشکار می‌کند. (ج) بازگشت باز می‌شود و بهترین مقدار برگ زیردرخت فراموش‌شده (۴۵۰) به فاگاراش پشتیبان‌گرفته می‌شود؛ سپس ریمنیکو ویلچا گسترش می‌یابد. این بار، چون بهترین مسیر جایگزین (از طریق تیمیشوآرا) دست‌کم ۴۴۷ هزینه دارد، گسترش تا بخارست ادامه می‌یابد.</figcaption></figure>
 <p><span class="en-inline">RBFS</span> تا حدی کارآمدتر از <span class="en-inline">IDA</span>∗ است، اما همچنان از بازتولید بیش از حد گره رنج می‌برد. در مثال شکل ۳.۲۳، <span class="en-inline">RBFS</span> مسیر از طریق ریمنیکو ویلچا را دنبال می‌کند، سپس «نظرش عوض می‌شود» و فاگاراش را می‌آزماید، و سپس دوباره نظر عوض می‌کند. این عوض‌شدن‌های نظر رخ می‌دهند، زیرا هر بار که بهترین مسیر کنونی بسط می‌یابد، مقدار f آن به احتمال زیاد افزایش می‌یابد — h معمولاً برای گره‌های نزدیک‌تر به هدف کمتر خوش‌بینانه است. وقتی این رخ می‌دهد، دومین‌بهترین مسیر ممکن است بهترین مسیر شود، پس جستجو باید برای دنبال‌کردنش به عقب برگردد. هر عوض‌شدن نظر با تکرار <span class="en-inline">IDA</span>∗ متناظر است و ممکن است بازگسترش‌های فراوانی از گره‌های فراموش‌شده لازم باشد تا بهترین مسیر بازآفرینی و یک گره دیگر بسط شود.</p>
 <p><span class="en-inline">RBFS</span> اگر تابع اکتشافی <span class="en-inline">h(n)</span> مقبول باشد بهینه است. پیچیدگی فضایی‌اش در عمق عمیق‌ترین راه‌حل بهینه خطی است، اما پیچیدگی زمانی‌اش به‌سختی قابل توصیف است: هم به دقت تابع اکتشافی و هم به اینکه بهترین مسیر هر چند وقت یک بار با گسترش گره‌ها تغییر می‌کند بستگی دارد. گره‌ها را به‌ترتیب امتیاز f فزاینده گسترش می‌دهد، حتی اگر f غیریکنواخت باشد.</p>

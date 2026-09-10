@@ -314,7 +314,7 @@ function MIN-VALUE(game, state, α, β) returns a (utility, move) pair
     child ← EXPAND(leaf)
     result ← SIMULATE(child)
     BACK-PROPAGATE(result, child)
-  return حرکت در ACTIONS(state) که گره‌اش بیشترین شمار بازی‌آزمایی را دارد</code></pre>
+  return the action in ACTIONS(state) whose node has the most playouts</code></pre>
 <p>یکی از سیاست‌های انتخاب بسیار مؤثر «کران اطمینان بالایی اعمال‌شده بر درخت‌ها» یا <span class="en-inline">UCT</span> نامیده می‌شود. سیاست هر حرکت ممکن را بر اساس فرمول کران اطمینان بالایی به نام <span class="en-inline">UCB1</span> رتبه‌بندی می‌کند. (برای جزئیات بیشتر بخش 17.3.3 را ببینید.) برای گرهٔ n، فرمول چنین است:</p>
 <p><span class="en-inline">UCB1(n) = U(n)/N(n) + C</span> × √(log N(PARENT(n)) / N(n))</p>
 <p>که <span class="en-inline">U(n)</span> مطلوبیت کل همهٔ بازی‌آزمایی‌هایی است که از گرهٔ n گذشتند، <span class="en-inline">N(n)</span> شمار بازی‌آزمایی‌های گذرنده از n، و <span class="en-inline">PARENT(n)</span> گرهٔ والد n در درخت است. پس <span class="en-inline">U(n)/N(n)</span> جملهٔ بهره‌برداری است: میانگین مطلوبیت <span class="en-inline">n.</span> جملهٔ با ریشهٔ دوم جملهٔ اکتشاف است: شمار <span class="en-inline">N(n)</span> در مخرج دارد، یعنی جمله برای گره‌هایی که فقط چند بار کاوش شده‌اند بالا خواهد بود. در صورت، لگاریتم تعداد دفعاتی را دارد که والد n را کاوش کرده‌ایم. این بدان معناست اگر n را درصدی غیرصفر از زمان انتخاب کنیم، جملهٔ اکتشاف با افزایش شمارها به صفر می‌گراید و سرانجام بازی‌آزمایی‌ها به گره‌ای با بیشترین میانگین مطلوبیت داده می‌شوند.</p>

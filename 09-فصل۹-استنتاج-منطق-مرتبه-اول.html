@@ -268,19 +268,19 @@ function UNIFY-VAR(var, x, θ) returns a substitution
 <p>شکل 9.3 الگوریتم استنتاج زنجیره‌سازی پیشروی ساده نشان می‌دهد. با شروع از واقعیت‌های شناخته‌شده، همهٔ قواعدی را که مقدمه‌هایشان برآورده شده فعال می‌کند و نتیجه‌هایشان را به واقعیت‌های شناخته‌شده می‌افزاید. فرایند تکرار می‌شود تا پرس‌وجو پاسخ داده شود (با فرض اینکه فقط یک پاسخ لازم است) یا واقعیت تازه‌ای افزوده نشود. توجه کنید واقعیت «تازه» نیست اگر فقط «تغییر نام» (Renaming) واقعیت شناخته‌شده‌ای باشد — جمله‌ای تغییر نام دیگری است اگر جز نام متغیرها یکسان باشند. برای نمونه، <span class="en-inline">Likes(x, IceCream)</span> و <span class="en-inline">Likes(y, IceCream)</span> تغییر نام یکدیگرند. هر دو همان معنا را می‌دهند: «همه بستنی دوست دارند.»</p>
 <figure class="fig"><img src="figures/ch09/fig-9-3.jpg" alt="شکل 9.3"><figcaption><strong>شکل 9.3 — الگوریتم زنجیره‌سازی پیشروِ از نظر مفهومی سرراست اما ناکارآمد.</strong> در هر تکرار، همهٔ جمله‌های اتمی را که می‌توان در یک گام از جمله‌های دلالتی و جمله‌های اتمیِ از قبل در <span class="en-inline">KB</span> استنتاج کرد به <span class="en-inline">KB</span> می‌افزاید. تابع <span class="en-inline">STANDARDIZE-VARIABLES</span> همهٔ متغیرهای آرگومان‌هایش را با متغیرهای تازه‌ای که قبلاً استفاده نشده‌اند جایگزین می‌کند.</figcaption></figure>
 <pre class="code"><code>function FOL-FC-ASK(KB, α) returns a substitution or false
-  inputs: KB، پایگاه دانش، مجموعه‌ای از بندهای معین مرتبهٔ اول
-          α، پرس‌وجو، جمله‌ای اتمی
+  inputs: KB, a knowledge base, a set of definite clauses in first-order logic
+          α, a query, an atomic sentence
   while true do
-    new ← {}    // مجموعهٔ جمله‌های تازه‌استنتاج‌شده در هر تکرار
-    for each rule در KB do
+    new ← {}    // set of newly inferred sentences in each iteration
+    for each rule in KB do
       (p1 ∧ ... ∧ pn ⇒ q) ← STANDARDIZE-VARIABLES(rule)
-      for each θ چنان‌که SUBST(θ, p1 ∧ ... ∧ pn) = SUBST(θ, p′1 ∧ ... ∧ p′n)
-                 برای برخی p′1, ..., p′n در KB do
+      for each θ such that SUBST(θ, p1 ∧ ... ∧ pn) = SUBST(θ, p′1 ∧ ... ∧ p′n)
+                 for some p′1, ..., p′n in KB do
         q′ ← SUBST(θ, q)
-        if q′ با جمله‌ای از قبل در KB یا new یکسان نمی‌شود then
+        if q′ is not already in KB or new then
           add q′ to new
           φ ← UNIFY(q′, α)
-          if φ failure نیست then return φ
+          if φ is not failure then return φ
     if new = {} then return false
     add new to KB</code></pre>
 <p>مشکل جنایت خود را برای نشان دادن <span class="en-inline">FOL-FC-ASK</span> استفاده می‌کنیم. جمله‌های دلالتیِ در دسترس برای زنجیره‌سازی عبارت‌اند از (9.3)، (9.6)، (9.7) و (9.8). دو تکرار لازم است:</p>
@@ -345,9 +345,9 @@ function UNIFY-VAR(var, x, θ) returns a substitution
   return FOL-BC-OR(KB, query, {})
 
 function FOL-BC-OR(KB, goal, θ) returns a substitution
-  for each rule در FETCH-RULES-FOR-GOAL(KB, goal) do
+  for each rule in FETCH-RULES-FOR-GOAL(KB, goal) do
     (lhs ⇒ rhs) ← STANDARDIZE-VARIABLES(rule)
-    for each θ′ در FOL-BC-AND(KB, lhs, UNIFY(rhs, goal, θ)) do
+    for each θ′ in FOL-BC-AND(KB, lhs, UNIFY(rhs, goal, θ)) do
       yield θ′
 
 function FOL-BC-AND(KB, goals, θ) returns a substitution
@@ -355,8 +355,8 @@ function FOL-BC-AND(KB, goals, θ) returns a substitution
   else if LENGTH(goals) = 0 then yield θ
   else
     first, rest ← FIRST(goals), REST(goals)
-    for each θ′ در FOL-BC-OR(KB, SUBST(θ, first), θ) do
-      for each θ′′ در FOL-BC-AND(KB, rest, θ′) do
+    for each θ′ in FOL-BC-OR(KB, SUBST(θ, first), θ) do
+      for each θ′′ in FOL-BC-AND(KB, rest, θ′) do
         yield θ′′</code></pre>
 <figure class="fig"><img src="figures/ch09/fig-9-7.jpg" alt="شکل 9.7"><figcaption><strong>شکل 9.7 — درخت برهان ساخته‌شده توسط زنجیره‌سازی پسرو برای اثبات اینکه وست جنایتکار است.</strong> درخت باید عمق-اول، چپ به راست خوانده شود. برای اثبات <span class="en-inline">Criminal(West)</span>، باید چهار عطف‌شوندهٔ زیر آن را اثبات کنیم. برخی از آن‌ها در پایگاه دانش‌اند و برخی دیگر به زنجیره‌سازی پسروی بیشتر نیاز دارند. اتصال‌های هر یکسان‌سازی موفق کنار زیرهدف متناظر نشان داده شده. توجه کنید پس از موفقیت یک زیرهدف در عطف، جانشینی‌اش بر زیرهدف‌های بعدی اعمال می‌شود. پس تا وقتی <span class="en-inline">FOL-BC-ASK</span> به آخرین عطف‌شونده می‌رسد، که در اصل <span class="en-inline">Hostile(z)</span> است، z از قبل به <span class="en-inline">Nono</span> اتصال یافته.</figcaption></figure>
 <p>زنجیره‌سازی پسرو، چنان‌که نوشته‌ایم، بدیهی است الگوریتم جستجوی عمق-اول است. این بدان معناست نیازهای فضایش در اندازهٔ برهان خطی است. همچنین بدان معناست زنجیره‌سازی پسرو (برخلاف زنجیره‌سازی پیشرو) از مسائل حالت‌های تکراری و ناکامل بودن رنج می‌برد. با وجود این محدودیت‌ها، زنجیره‌سازی پسرو در زبان‌های برنامه‌نویسی منطقی محبوب و مؤثر ثابت شده.</p>

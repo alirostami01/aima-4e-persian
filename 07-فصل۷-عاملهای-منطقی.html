@@ -156,8 +156,8 @@
 <p>شکل 7.1 نمای کلی برنامهٔ عامل مبتنی بر دانش را نشان می‌دهد. مانند همهٔ عامل‌های ما، ادراک حسی را به‌عنوان ورودی می‌گیرد و کنشی بازمی‌گرداند. عامل پایگاه دانشی به نام <span class="en-inline">KB</span> نگه می‌دارد که در آغاز ممکن است مقداری «دانش زمینه‌ای» (Background Knowledge) داشته باشد.</p>
 <figure class="fig"><img src="figures/ch07/fig-7-1.jpg" alt="شکل 7.1"><figcaption><strong>شکل 7.1 — عامل مبتنی بر دانش عمومی.</strong> با دریافت ادراک حسی، عامل ادراک را به پایگاه دانشش می‌افزاید، از پایگاه دانش بهترین کنش را می‌پرسد و به پایگاه دانش می‌گوید که در واقع آن کنش را انجام داده.</figcaption></figure>
 <pre class="code"><code>function KB-AGENT(percept) returns an action
-  persistent: KB، یک پایگاه دانش
-              t، یک شمارنده، در آغاز 0، نشان‌دهندهٔ زمان
+  persistent: KB، a knowledge base
+              t، a counter, initially 0, indicating the time
   TELL(KB, MAKE-PERCEPT-SENTENCE(percept, t))
   action ← ASK(KB, MAKE-ACTION-QUERY(t))
   TELL(KB, MAKE-ACTION-SENTENCE(action, t))
@@ -301,15 +301,15 @@
 <p>البته «متناهی» همیشه همان «اندک» نیست. اگر <span class="en-inline">KB</span> و α در مجموع n نماد داشته باشند، 2ⁿ مدل هست. پس پیچیدگی زمانی الگوریتم O(2ⁿ) است. (پیچیدگی فضایی فقط <span class="en-inline">O(n)</span> است، زیرا شمارش عمق-اول است.) بعداً در این فصل الگوریتم‌هایی نشان می‌دهیم که در بسیاری از موارد بسیار کارآمدترند. متأسفانه، لازمهٔ گزاره‌ای هم‌<span class="en-inline">NP</span>-کامل است (یعنی احتمالاً آسان‌تر از <span class="en-inline">NP</span>-کامل نیست — پیوست الف را ببینید)، پس هر الگوریتم استنتاج شناخته‌شده برای منطق گزاره‌ای پیچیدگی بدترین حالتی ◮ دارد که در اندازهٔ ورودی نمایی است.</p>
 <figure class="fig"><img src="figures/ch07/fig-7-10.jpg" alt="شکل 7.10"><figcaption><strong>شکل 7.10 — الگوریتم شمارش جدول-صدق برای تصمیم‌گیری دربارهٔ لازمهٔ گزاره‌ای.</strong> (<span class="en-inline">TT</span> مخفف جدول صدق است.) <span class="en-inline">PL-TRUE? true</span> بازمی‌گرداند اگر جمله‌ای درون مدلی برقرار باشد. متغیر <span class="en-inline">model</span> مدل جزئی را بازنمایی می‌کند — تخصیصی به برخی از نمادها. کلیدواژهٔ <span class="en-inline">and</span> در این‌جا نماد تابع میانی در زبان شبه‌کد برنامه‌نویسی است، نه عملگری در منطق گزاره‌ای؛ دو آرگومان می‌گیرد و <span class="en-inline">true</span> یا <span class="en-inline">false</span> بازمی‌گرداند.</figcaption></figure>
 <pre class="code"><code>function TT-ENTAILS?(KB, α) returns true or false
-  inputs: KB، پایگاه دانش، جمله‌ای در منطق گزاره‌ای
-          α، پرس‌وجو، جمله‌ای در منطق گزاره‌ای
-  symbols ← فهرستی از نمادهای گزاره‌ای در KB و α
+  inputs: KB, a knowledge base, a sentence in propositional logic
+          α, a query, a sentence in propositional logic
+  symbols ← a list of propositional symbols in KB and α
   return TT-CHECK-ALL(KB, α, symbols, {})
 
 function TT-CHECK-ALL(KB, α, symbols, model) returns true or false
   if EMPTY?(symbols) then
     if PL-TRUE?(KB, model) then return PL-TRUE?(α, model)
-    else return true    // وقتی KB کاذب است، همیشه true بازگردان
+    else return true    // when KB is false, always return true
   else
     P ← FIRST(symbols)
     rest ← REST(symbols)
@@ -450,14 +450,14 @@ function TT-CHECK-ALL(KB, α, symbols, model) returns true or false
 </ul>
 <figure class="fig"><img src="figures/ch07/fig-7-13.jpg" alt="شکل 7.13"><figcaption><strong>شکل 7.13 — الگوریتم حل ساده برای منطق گزاره‌ای.</strong> <span class="en-inline">PL-RESOLVE</span> مجموعهٔ همهٔ بندهای ممکنِ حاصل از حل دو ورودی‌اش را بازمی‌گرداند.</figcaption></figure>
 <pre class="code"><code>function PL-RESOLUTION(KB, α) returns true or false
-  inputs: KB، پایگاه دانش، جمله‌ای در منطق گزاره‌ای
-          α، پرس‌وجو، جمله‌ای در منطق گزاره‌ای
-  clauses ← مجموعهٔ بندها در بازنمایی CNF از KB ∧ ¬α
+  inputs: KB، a knowledge base, a sentence in propositional logic
+          α، a query, a sentence in propositional logic
+  clauses ← the set of clauses in the CNF representation of KB ∧ ¬α
   new ← {}
   while true do
-    for each جفت بند Ci, Cj در clauses do
+    for each pair of clauses Ci, Cj in clauses do
       resolvents ← PL-RESOLVE(Ci, Cj)
-      if resolvents شامل بند خالی است then return true
+      if resolvents contains the empty clause then return true
       new ← new ∪ resolvents
     if new ⊆ clauses then return false
     clauses ← clauses ∪ new</code></pre>
@@ -493,17 +493,17 @@ function TT-CHECK-ALL(KB, α, symbols, model) returns true or false
 <p>به‌راحتی دیده می‌شود زنجیره‌سازی پیشرو درست است: هر استنتاج اساساً کاربردی از مدوس پوننس است. زنجیره‌سازی پیشرو همچنین کامل است: هر جملهٔ اتمیِ مستلزم مشتق خواهد شد. ساده‌ترین راه دیدن این، در نظر گرفتن حالت نهایی جدول <span class="en-inline">inferred</span> (پس از آنکه الگوریتم به نقطهٔ ثابتی رسید که در آن استنتاج تازه‌ای ممکن نیست) است. جدول برای هر نمادِ استنتاج‌شده در طول فرایند <span class="en-inline">true</span> و برای همهٔ نمادهای دیگر <span class="en-inline">false</span> دارد. می‌توانیم جدول را مدلی منطقی ببینیم؛ وانگهی، هر بند معین در <span class="en-inline">KB</span> اصلی در این مدل صادق است. ◮</p>
 <figure class="fig"><img src="figures/ch07/fig-7-15.jpg" alt="شکل 7.15"><figcaption><strong>شکل 7.15 — الگوریتم زنجیره‌سازی پیشرو برای منطق گزاره‌ای.</strong> دستور کار (agenda) نمادهای شناخته‌شده‌صادق اما هنوز «پردازش‌نشده» را پیگیری می‌کند. جدول <span class="en-inline">count</span> پیگیری می‌کند چند مقدمه از هر دلالت هنوز اثبات نشده. هرگاه نماد تازه‌ای p از دستور کار پردازش شود، برای هر دلالتی که p در مقدمش ظاهر می‌شود <span class="en-inline">count</span> یک واحد کم می‌شود (با فهرست‌بندی مناسب در زمان ثابت به‌راحتی شناسایی می‌شود). اگر <span class="en-inline">count</span> به صفر برسد، همهٔ مقدمه‌های دلالت شناخته‌شده‌اند، پس نتیجه‌اش را می‌توان به دستور کار افزود. سرانجام، باید پیگیری کنیم کدام نمادها پردازش شده‌اند؛ نمادی که از قبل در مجموعهٔ نمادهای استنتاج‌شده است لازم نیست دوباره به دستور کار افزوده شود. این از کار زائد جلوگیری می‌کند و از حلقه‌های ناشی از دلالت‌هایی مانند P ⇒ Q و Q ⇒ P جلوگیری می‌کند.</figcaption></figure>
 <pre class="code"><code>function PL-FC-ENTAILS?(KB, q) returns true or false
-  inputs: KB، پایگاه دانش، مجموعه‌ای از بندهای معین گزاره‌ای
-          q، پرس‌وجو، یک نماد گزاره‌ای
-  count ← جدولی که در آن count[c] در آغاز شمار نمادهای مقدم بند c است
-  inferred ← جدولی که در آن inferred[s] در آغاز برای همهٔ نمادها false است
-  queue ← صفی از نمادها، در آغاز نمادهای شناخته‌شده‌صادق در KB
-  while queue خالی نیست do
+  inputs: KB، a knowledge base, a set of definite clauses in propositional logic
+          q، a query, a propositional symbol
+  count ← a table in which count[c] is initially the number of symbols in the premise of clause c
+  inferred ← a table in which inferred[s] is initially false for all symbols
+  queue ← a queue of symbols, initially the symbols known to be true in KB
+  while queue is not empty do
     p ← POP(queue)
     if p = q then return true
     if inferred[p] = false then
       inferred[p] ← true
-      for each بند c در KB که p در c.PREMISE است do
+      for each clause c in KB where p is in c.PREMISE do
         decrement count[c]
         if count[c] = 0 then add c.CONCLUSION to queue
   return false</code></pre>
@@ -525,18 +525,18 @@ function TT-CHECK-ALL(KB, α, symbols, model) returns true or false
 <p>الگوریتم <span class="en-inline">DPLL</span> در شکل 7.17 نشان داده شده، که اسکلت ضروری فرایند جستجو را بدون جزئیات پیاده‌سازی می‌دهد.</p>
 <figure class="fig"><img src="figures/ch07/fig-7-17.jpg" alt="شکل 7.17"><figcaption><strong>شکل 7.17 — الگوریتم DPLL برای بررسی ارضاپذیری جمله‌ای در منطق گزاره‌ای.</strong> ایده‌های پشت <span class="en-inline">FIND-PURE-SYMBOL</span> و <span class="en-inline">FIND-UNIT-CLAUSE</span> در متن توصیف شده؛ هر یک نمادی (یا null) و مقدار صدقی برای تخصیص به آن نماد بازمی‌گرداند. مانند <span class="en-inline">TT-ENTAILS?</span>، <span class="en-inline">DPLL</span> روی مدل‌های جزئی عمل می‌کند.</figcaption></figure>
 <pre class="code"><code>function DPLL-SATISFIABLE?(s) returns true or false
-  inputs: s، جمله‌ای در منطق گزاره‌ای
-  clauses ← مجموعهٔ بندها در بازنمایی CNF از s
-  symbols ← فهرستی از نمادهای گزاره‌ای در s
+  inputs: s, a sentence in propositional logic
+  clauses ← the set of clauses in the CNF representation of s
+  symbols ← a list of propositional symbols in s
   return DPLL(clauses, symbols, {})
 
 function DPLL(clauses, symbols, model) returns true or false
-  if هر بند در clauses در model صادق است then return true
-  if برخی بندها در clauses در model کاذب است then return false
+  if every clause in clauses is true in model then return true
+  if some clause in clauses is false in model then return false
   P, value ← FIND-PURE-SYMBOL(symbols, clauses, model)
-  if P null نیست then return DPLL(clauses, symbols – P, model ∪ {P=value})
+  if P is not null then return DPLL(clauses, symbols – P, model ∪ {P=value})
   P, value ← FIND-UNIT-CLAUSE(clauses, model)
-  if P null نیست then return DPLL(clauses, symbols – P, model ∪ {P=value})
+  if P is not null then return DPLL(clauses, symbols – P, model ∪ {P=value})
   P ← FIRST(symbols); rest ← REST(symbols)
   return DPLL(clauses, rest, model ∪ {P=true}) or
          DPLL(clauses, rest, model ∪ {P=false})</code></pre>
@@ -554,16 +554,16 @@ function DPLL(clauses, symbols, model) returns true or false
 <p>یکی از ساده‌ترین و مؤثرترین الگوریتم‌های برآمده از همهٔ این کارها <span class="en-inline">WALKSAT</span> نامیده می‌شود (شکل 7.18). در هر تکرار، الگوریتم بند ارضا‌نشده‌ای برمی‌گزیند و نمادی در بند برای وارون‌کردن برمی‌گزیند. بین دو راه انتخاب نماد برای وارون‌کردن تصادفی یکی را برمی‌گزیند: (۱) گام «کمترین-تعارض» که شمار بندهای ارضا‌نشده در حالت تازه را کمینه می‌کند و (۲) گام «گام تصادفی» که نماد را تصادفی برمی‌گزیند.</p>
 <figure class="fig"><img src="figures/ch07/fig-7-18.jpg" alt="شکل 7.18"><figcaption><strong>شکل 7.18 — الگوریتم WALKSAT برای بررسی ارضاپذیری با وارون‌کردن تصادفی مقادیر متغیرها.</strong> نسخه‌های بسیاری از الگوریتم وجود دارد.</figcaption></figure>
 <pre class="code"><code>function WALKSAT(clauses, p, max flips) returns a satisfying model or failure
-  inputs: clauses، مجموعه‌ای از بندها در منطق گزاره‌ای
-          p، احتمال انتخاب انجام حرکت «گام تصادفی»، معمولاً حدود 0.5
-          max flips، شمار وارون‌های مقدار مجاز پیش از دست‌کشیدن
-  model ← تخصیص تصادفی true/false به نمادهای clauses
+  inputs: clauses, a set of clauses in propositional logic
+          p, the probability of choosing a random-walk move, usually around 0.5
+          max flips, the maximum number of value flips allowed before giving up
+  model ← a random assignment of true/false to the symbols in clauses
   for each i = 1 to max flips do
-    if model بندها را ارضا می‌کند then return model
-    clause ← بند تصادفی‌برگزیده از clauses که در model کاذب است
+    if model satisfies the clauses then return model
+    clause ← a randomly selected clause from clauses that is false in model
     if RANDOM(0, 1) ≤ p then
-      مقدار نماد تصادفی‌برگزیده از clause را در model وارون کن
-    else وارون کن هر نمادی در clause که شمار بندهای ارضا‌شده را بیشینه می‌کند
+      flip the value of a randomly selected symbol from clause in model
+    else flip the symbol in clause that maximizes the number of satisfied clauses
   return failure</code></pre>
 <p>وقتی <span class="en-inline">WALKSAT</span> مدلی بازمی‌گرداند، جملهٔ ورودی واقعاً ارضاپذیر است، اما وقتی شکست بازمی‌گرداند، دو علت ممکن هست: یا جمله ارضاپذیر نیست یا باید به الگوریتم زمان بیشتری بدهیم. اگر <span class="en-inline">max flips</span> = ∞ و <span class="en-inline">p &gt; 0</span> تنظیم کنیم، <span class="en-inline">WALKSAT</span> سرانجام مدلی بازخواهد گرداند (اگر وجود داشته باشد)، زیرا گام‌های تصادفی سرانجام به راه‌حل خواهند خورد. افسوس، اگر <span class="en-inline">max flips</span> بی‌نهایت باشد و جمله ارضاپذیر نباشد، الگوریتم هرگز پایان نمی‌یابد!</p>
 <p>به همین دلیل، <span class="en-inline">WALKSAT</span> وقتی مفیدتر است که انتظار داریم راه‌حلی وجود داشته باشد — برای نمونه، مسائل بحث‌شده در فصل‌های ۳ و ۶ معمولاً راه‌حل دارند. از سوی دیگر، <span class="en-inline">WALKSAT</span> نمی‌تواند همیشه ارضاپذیرنبودن را تشخیص دهد، که برای تصمیم‌گیری دربارهٔ لازمه لازم است. برای نمونه، عامل نمی‌تواند به‌طور قابل اعتمادی از <span class="en-inline">WALKSAT</span> برای اثبات امن‌بودن خانه‌ای در جهان وومپوس استفاده کند. در عوض، می‌تواند بگوید: «یک ساعت فکر کردم و نتوانستم جهان ممکنی درآورم که در آن خانه امن نباشد.» این ممکن است نشانگر تجربی خوبی باشد که خانه امن است، اما قطعاً برهان نیست.</p>
@@ -620,26 +620,26 @@ function DPLL(clauses, symbols, model) returns true or false
 <p>برنامه‌ریزی مسیر با جستجوی A∗ انجام می‌شود، نه با <span class="en-inline">ASK.</span> اگر خانه‌های امنی برای کاوش نمانده باشد، گام بعدی — اگر عامل هنوز تیر دارد — تلاش برای امن‌کردن خانه‌ای با تیراندازی به یکی از مکان‌های احتمالی وومپوس است. این‌ها با پرسیدن اینکه کجا ASK(KB, ¬Wx,y) کاذب است — یعنی کجا معلوم نیست وومپوسی نیست — تعیین می‌شوند. تابع <span class="en-inline">PLAN-SHOT</span> (نشان داده نشده) از <span class="en-inline">PLAN-ROUTE</span> برای برنامه‌ریزی توالی کنشی استفاده می‌کند که این شلیک را هم‌راستا کند. اگر این شکست بخورد، برنامه به‌دنبال خانه‌ای برای کاوش می‌گردد که به‌شکل اثبات‌پذیر ناامن نباشد — یعنی خانه‌ای که ASK(KB, ¬<span class="en-inline">OK</span>ᵗx,y) برایش <span class="en-inline">false</span> بازمی‌گرداند. اگر چنین خانه‌ای نباشد، مأموریت ناممکن است و عامل به [1,1] عقب‌نشینی می‌کند و از غار بیرون می‌آید.</p>
 <figure class="fig"><img src="figures/ch07/fig-7-20.jpg" alt="شکل 7.20"><figcaption><strong>شکل 7.20 — برنامهٔ عامل ترکیبی برای جهان وومپوس.</strong> از پایگاه دانش گزاره‌ای برای استنتاج حالت جهان و ترکیبی از جستجوی حل مسئله و کد حوزه‌ویژه برای انتخاب کنش‌ها استفاده می‌کند. هر بار که <span class="en-inline">HYBRID-WUMPUS-AGENT</span> فراخوانی می‌شود، ادراک را به پایگاه دانش می‌افزاید و سپس یا به برنامهٔ قبلی تکیه می‌کند یا برنامهٔ تازه‌ای می‌سازد، و نخستین گام برنامه را به‌عنوان کنش بعدی برمی‌دارد.</figcaption></figure>
 <pre class="code"><code>function HYBRID-WUMPUS-AGENT(percept) returns an action
-  inputs: percept، فهرستی، [stench, breeze, glitter, bump, scream]
-  persistent: KB، پایگاه دانش، در آغاز «فیزیک وومپوس» بی‌زمان
-              t، شمارنده، در آغاز 0، نشان‌دهندهٔ زمان
-              plan، توالی کنش، در آغاز خالی
+  inputs: percept, a list, [stench, breeze, glitter, bump, scream]
+  persistent: KB, a knowledge base, initially the timeless Wumpus physics
+              t, a counter, initially 0, indicating the time
+              plan, an action sequence, initially empty
   TELL(KB, MAKE-PERCEPT-SENTENCE(percept, t))
-  جمله‌های «فیزیک» زمانی را برای زمان t به KB اضافه کن
+  add the temporalized "physics" sentences for time t to KB
   safe ← {[x,y] : ASK(KB, OKᵗx,y) = true}
   if ASK(KB, Glitterᵗ) = true then
     plan ← [Grab] + PLAN-ROUTE(current, {[1,1]}, safe) + [Climb]
-  if plan خالی است then
-    unvisited ← {[x,y] : ASK(KB, Lᵗ′x,y) = false برای همهٔ t′ ≤ t}
+  if plan is empty then
+    unvisited ← {[x,y] : ASK(KB, Lᵗ′x,y) = false for all t′ ≤ t}
     plan ← PLAN-ROUTE(current, unvisited ∩ safe, safe)
-  if plan خالی است and ASK(KB, HaveArrowᵗ) = true then
+  if plan is empty and ASK(KB, HaveArrowᵗ) = true then
     possible wumpus ← {[x,y] : ASK(KB, ¬Wx,y) = false}
     plan ← PLAN-SHOT(current, possible wumpus, safe)
-  if plan خالی است then
-    // چاره‌ای جز ریسک‌کردن نیست
+  if plan is empty then
+    // no choice but to take a risk
     not unsafe ← {[x,y] : ASK(KB, ¬OKᵗx,y) = false}
     plan ← PLAN-ROUTE(current, unvisited ∩ not unsafe, safe)
-  if plan خالی است then
+  if plan is empty then
     plan ← PLAN-ROUTE(current, {[1,1]}, safe) + [Climb]
   action ← POP(plan)
   TELL(KB, MAKE-ACTION-SENTENCE(action, t))
@@ -647,11 +647,11 @@ function DPLL(clauses, symbols, model) returns true or false
   return action
 
 function PLAN-ROUTE(current, goals, allowed) returns an action sequence
-  inputs: current، موقعیت کنونی عامل
-          goals، مجموعه‌ای از خانه‌ها؛ تلاش برای برنامه‌ریزی مسیری به یکی از آن‌ها
-          allowed، مجموعه‌ای از خانه‌ها که می‌توانند بخشی از مسیر باشند
+  inputs: current, the agent's current location
+          goals, a set of squares; attempt to plan a route to one of them
+          allowed, a set of squares that may be part of the route
   problem ← ROUTE-PROBLEM(current, goals, allowed)
-  return SEARCH(problem)   // هر الگوریتم جستجو از فصل ۳</code></pre>
+  return SEARCH(problem)   // any search algorithm from Chapter 3</code></pre>
 <h3>7.7.3 تخمین حالت منطقی</h3>
 <p>برنامهٔ عامل شکل 7.20 کاملاً خوب کار می‌کند، اما یک ضعف عمده دارد: با گذشت زمان، هزینهٔ محاسباتی درگیر در فراخوانی‌های <span class="en-inline">ASK</span> بیشتر و بیشتر می‌شود. این عمدتاً به‌سبب آن است که استنتاج‌های لازم باید در زمان بیشتر و بیشتر به عقب بروند و نمادهای گزارهٔ بیشتری را درگیر کنند. بدیهی است این پایدار نیست — نمی‌توانیم عاملی داشته باشیم که زمان پردازش هر ادراکش متناسب با طول عمرش رشد کند! آنچه واقعاً نیاز داریم زمان به‌روزرسانی ثابت است — یعنی مستقل از <span class="en-inline">t.</span> پاسخ بدیهی آن است که نتایج استنتاج را ذخیره یا «کش» (Cache) کنیم، تا فرایند استنتاج در گام زمانی بعد بتواند بر نتایج گام‌های قبلی بنا کند به‌جای آنکه مجبور باشد از صفر از نو آغاز کند.</p>
 <p>چنان‌که در بخش 4.4 دیدیم، تاریخچهٔ ادراک‌ها و همهٔ پیامدهایش را می‌توان با حالت باور جایگزین کرد — یعنی بازنمایی‌ای از مجموعهٔ همهٔ حالت‌های کنونی ممکن جهان.<sup>¹³</sup> فرایند به‌روزرسانی حالت باور هنگام رسیدن ادراک‌های تازه «تخمین حالت» (State Estimation) نامیده می‌شود (صفحهٔ ۱۳۲ را ببینید). در حالی که در بخش 4.4 حالت باور فهرست صریحی از حالت‌ها بود، این‌جا می‌توانیم از جملهٔ منطقی شامل نمادهای گزاره‌ای مرتبط با گام زمانی کنونی و نیز نمادهای بی‌زمان استفاده کنیم. برای نمونه، جملهٔ منطقی</p>
@@ -674,12 +674,12 @@ function PLAN-ROUTE(current, goals, allowed) returns an action sequence
 <p>رویهٔ برنامه‌ریزی گزاره‌ای، <span class="en-inline">SATPLAN</span>، در شکل 7.22 نشان داده شده. ایدهٔ پایهٔ تازه‌داده‌شده را با یک پیچش پیاده می‌کند. چون عامل نمی‌داند چند گام برای رسیدن به هدف لازم است، الگوریتم هر شمار ممکن گام‌ها t را تا بیشینهٔ طول برنامهٔ قابل تصور <span class="en-inline">Tmax</span> امتحان می‌کند. بدین ترتیب، تضمین‌شده کوتاه‌ترین برنامه را اگر وجود داشته باشد می‌یابد. به‌سبب شیوهٔ جستجوی <span class="en-inline">SATPLAN</span> برای راه‌حل، این رویکرد را نمی‌توان در محیط تا حدی قابل مشاهده استفاده کرد؛ <span class="en-inline">SATPLAN</span> متغیرهای مشاهده‌ناپذیر را به مقادیری که برای ایجاد راه‌حل نیاز دارد تنظیم می‌کرد.</p>
 <figure class="fig"><img src="figures/ch07/fig-7-22.jpg" alt="شکل 7.22"><figcaption><strong>شکل 7.22 — الگوریتم SATPLAN.</strong> مسئلهٔ برنامه‌ریزی به جملهٔ <span class="en-inline">CNF</span> ترجمه می‌شود که در آن ادعا می‌شود هدف در گام زمانی ثابت t برقرار است و اصل‌موضوعه‌هایی برای هر گام زمانی تا t شامل می‌شود. اگر الگوریتم ارضاپذیری مدلی بیابد، برنامه‌ای با نگاه‌کردن به آن نمادهای گزاره‌ای که به کنش‌ها اشاره دارند و در مدل <span class="en-inline">true</span> تخصیص یافته‌اند استخراج می‌شود. اگر مدلی نباشد، فرایند با جابه‌جاکردن هدف یک گام بعدتر تکرار می‌شود.</figcaption></figure>
 <pre class="code"><code>function SATPLAN(init, transition, goal, T max) returns solution or failure
-  inputs: init, transition, goal، توصیفی از مسئله را تشکیل می‌دهند
-          T max، حد بالایی برای طول برنامه
+  inputs: init, transition, goal، form a description of the problem
+          T max، the upper bound on plan length
   for t = 0 to T max do
     cnf ← TRANSLATE-TO-SAT(init, transition, goal, t)
     model ← SAT-SOLVER(cnf)
-    if model null نیست then
+    if model null is not then
       return EXTRACT-SOLUTION(model)
   return failure</code></pre>
 <p>گام کلیدی در استفاده از <span class="en-inline">SATPLAN</span>، ساخت پایگاه دانش است. ممکن است در بازرسی گذرا به نظر برسد اصل‌موضوعه‌های جهان وومپوس در بخش 7.7.1 برای گام‌های 1(الف) و 1(ب) بالا کافی‌اند. اما تفاوت معناداری میان الزام‌های لازمه (چنان‌که با <span class="en-inline">ASK</span> آزموده می‌شود) و ارضاپذیری هست.</p>

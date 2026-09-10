@@ -244,18 +244,18 @@
 <p>بهترین کاری که می‌توانیم بکنیم بازگرداندنِ رایج‌ترین مقدارِ خروجیِ مثال‌های باقی‌مانده است.</p>
 <p>الگوریتمِ <span class="en-inline">LEARN-DECISION-TREE</span> در شکل ۱۹.۵ نشان داده شده. توجه کنید مجموعهٔ مثال‌ها ورودیِ الگوریتم است، اما هیچ‌جا مثال‌ها در درختِ بازگردانده‌شده توسط الگوریتم ظاهر نمی‌شوند. درخت از آزمون‌های روی ویژگی‌ها در گره‌های داخلی، مقادیرِ ویژگی روی شاخه‌ها و مقادیرِ خروجی روی گره‌های برگ تشکیل شده. جزئیاتِ تابعِ <span class="en-inline">IMPORTANCE</span> در بخش ۱۹.۳.۳ داده شده. خروجیِ الگوریتمِ یادگیری روی مجموعهٔ آموزشیِ نمونه‌مان در شکل ۱۹.۶ نشان داده شده.</p>
 <figure class="fig"><img src="figures/ch19/fig-19-5.jpg" alt="شکل 19.5"><figcaption><strong>شکل ۱۹.۵ — الگوریتمِ یادگیریِ درختِ تصمیم. تابعِ IMPORTANCE در بخش ۱۹.۳.۳ توصیف شده. تابعِ PLURALITY-VALUE رایج‌ترین مقدارِ خروجی را میانِ مجموعه‌ای از مثال‌ها انتخاب می‌کند و تساوی‌ها را تصادفی می‌شکند.</strong></figcaption></figure>
-<pre class="code"><code>تابع LEARN-DECISION-TREE(examples, attributes, parent examples) درختی برمی‌گرداند
-  اگر examples خالی است پس بازگرداندن PLURALITY-VALUE(parent examples)
-  وگرنه اگر همهٔ examples همان رده‌بندی را دارند پس بازگرداندن همان رده‌بندی
-  وگرنه اگر attributes خالی است پس بازگرداندن PLURALITY-VALUE(examples)
-  وگرنه:
+<pre class="code"><code>function LEARN-DECISION-TREE(examples, attributes, parent examples) returns a decision tree
+  if examples is empty then return PLURALITY-VALUE(parent examples)
+  else if all examples have the same classification then return the classification
+  else if attributes is empty then return PLURALITY-VALUE(examples)
+  else:
       A ← argmax_{a∈attributes} IMPORTANCE(a, examples)
-      tree ← درختِ تصمیمِ تازه با آزمونِ ریشهٔ A
-      برای هر مقدارِ v از A:
-          exs ← {e : e ∈ examples و e.A = v}
+      tree ← a new decision tree with root test A
+      for each value v of A:
+          exs ← {e : e ∈ examples and e.A = v}
           subtree ← LEARN-DECISION-TREE(exs, attributes − A, examples)
-          شاخه‌ای به tree با برچسبِ (A = v) و زیردرختِ subtree بیفزا
-      بازگرداندن tree</code></pre>
+          add a branch to tree with label (A = v) and subtree subtree
+      return tree</code></pre>
 <figure class="fig"><img src="figures/ch19/fig-19-6.jpg" alt="شکل 19.6"><figcaption><strong>شکل ۱۹.۶ — درختِ تصمیمِ استقراشده از مجموعهٔ آموزشیِ ۱۲-مثاله. (ریشه: Patrons؛ شاخهٔ None → No؛ شاخهٔ Some → Yes؛ شاخهٔ Full → Hungry؛ Hungry=No → No؛ Hungry=Yes → Fri/Sat؛ Fri/Sat=No → No؛ Fri/Sat=Yes → Type؛ Type=French → Yes؛ Type=Italian → No؛ Type=Thai → Yes؛ Type=Burger → No.)</strong></figcaption></figure>
 <p>درختِ یادگرفته‌شده به‌وضوح با درختِ اصلیِ نشان‌داده‌شده در شکل ۱۹.۳ متفاوت است. ممکن است نتیجه بگیریم الگوریتمِ یادگیری کارِ خیلی خوبی در یادگیریِ تابعِ درست انجام نمی‌دهد. این نتیجه‌گیریِ اشتباهی می‌بود. الگوریتمِ یادگیری به مثال‌ها نگاه می‌کند، نه به تابعِ درست، و در واقع، فرضیه‌اش (شکل ۱۹.۶ را ببینید) نه فقط با همهٔ مثال‌ها سازگار است، بلکه به‌طورِ قابلِ‌توجهی از درختِ اصلی ساده‌تر است! با مثال‌های کمی متفاوت درخت ممکن است بسیار متفاوت باشد، اما تابعی که بازنمایی می‌کند مشابه خواهد بود.</p>
 <p>الگوریتمِ یادگیری دلیلی برای گنجاندنِ آزمون‌های <span class="en-inline">Raining</span> و <span class="en-inline">Reservation</span> ندارد، زیرا می‌تواند همهٔ مثال‌ها را بدونِ آن‌ها رده‌بندی کند. همچنین الگوی جالبی را که قبلاً مشکوک نبود تشخیص داده: <span class="en-inline">SR</span> برای غذای تایلندی در آخرِ هفته منتظر خواهد ماند. همچنین محکوم به اشتباه‌هایی برای مواردی است که هیچ مثالی ندیده. برای نمونه، هرگز موردی را ندیده که انتظار 0–10 دقیقه باشد اما رستوران پر باشد. در آن صورت می‌گوید وقتی <span class="en-inline">Hungry</span> کاذب است منتظر نمان، اما <span class="en-inline">SR</span> قطعاً منتظر می‌ماند. با مثال‌های آموزشیِ بیشتر برنامهٔ یادگیری می‌توانست این اشتباه را تصحیح کند.</p>
@@ -386,14 +386,14 @@ Gain(Type) = 1 − [(2/12)B(1/2) + (2/12)B(1/2) + (4/12)B(2/4) + (4/12)B(2/4)] =
 <p>بنابراین، هر الگوریتمی که فهرستِ تصمیمِ سازگاری برمی‌گرداند، تابعِ <span class="en-inline">k-DL</span> را در شمارِ معقولی مثال، برای k کوچک، <span class="en-inline">PAC</span>-یاد می‌گیرد.</p>
 <p>تکلیفِ بعدی یافتنِ الگوریتمِ کارآمدی است که فهرستِ تصمیمِ سازگار برمی‌گرداند. از الگوریتمِ حریصانه‌ای به نامِ <span class="en-inline">DECISION-LIST-LEARNING</span> استفاده می‌کنیم که مکرراً آزمونی را می‌یابد که دقیقاً با زیرمجموعه‌ای از مجموعهٔ آموزشی موافق است. وقتی چنین آزمونی یافت، آن را به فهرستِ تصمیمِ درحالِ‌ساخت می‌افزاید و مثال‌های متناظر را حذف می‌کند. سپس بقیهٔ فهرستِ تصمیم را با فقط مثال‌های باقی‌مانده می‌سازد. این تا وقتی تکرار می‌شود که مثالی باقی نماند. الگوریتم در شکل ۱۹.۱۱ نشان داده شده.</p>
 <figure class="fig"><img src="figures/ch19/fig-19-11.jpg" alt="شکل 19.11"><figcaption><strong>شکل ۱۹.۱۱ — الگوریتمی برای یادگیریِ فهرست‌های تصمیم.</strong></figcaption></figure>
-<pre class="code"><code>تابع DECISION-LIST-LEARNING(examples) فهرستِ تصمیم برمی‌گرداند، یا failure
-  اگر examples خالی است پس بازگرداندن فهرستِ تصمیمِ بی‌اهمیتِ No
-  t ← آزمونی که با زیرمجموعهٔ غیرخالیِ examplest از examples موافق است
-        به‌گونه‌ای که اعضای examplest همه مثبت یا همه منفی‌اند
-  اگر چنین t نیست پس بازگرداندن failure
-  اگر مثال‌های examplest مثبت‌اند پس o ← Yes وگرنه o ← No
-  بازگرداندن فهرستِ تصمیم با آزمونِ اولیهٔ t و پیامدِ o و آزمون‌های باقی‌مانده
-        که توسط DECISION-LIST-LEARNING(examples − examplest) داده می‌شوند</code></pre>
+<pre class="code"><code>function DECISION-LIST-LEARNING(examples) returns a decision list, or failure
+  if examples is empty then return the trivial decision list No
+  t ← a test that agrees with a nonempty subset examplest of examples
+        such that the members of examplest are all positive or all negative
+  if no such t then return failure
+  if examples in examplest are positive then o ← Yes else o ← No
+  return a decision list with initial test t and outcome o and remaining tests
+        given by DECISION-LIST-LEARNING(examples − examplest)</code></pre>
 <p>این الگوریتم روشِ انتخابِ آزمونِ بعدی برای افزودن به فهرستِ تصمیم را مشخص نمی‌کند. اگرچه نتایجِ صوریِ داده‌شدهٔ قبلی به روشِ انتخاب بستگی ندارند، معقول به نظر می‌رسد آزمون‌های کوچکی را ترجیح دهیم که با مجموعه‌های بزرگِ مثال‌های یکنواخت‌رده‌بندی‌شده موافق‌اند، تا فهرستِ تصمیمِ کلی تا آن‌جا که ممکن است فشرده باشد. ساده‌ترین استراتژی یافتنِ کوچک‌ترین آزمونِ t است که با هر زیرمجموعهٔ یکنواخت‌رده‌بندی‌شده موافق است، صرف‌نظر از اندازهٔ زیرمجموعه. حتی این رویکرد نیز به‌خوبی کار می‌کند، چنان‌که شکل ۱۹.۱۲ پیشنهاد می‌کند. برای این مسئله، درختِ تصمیم کمی سریع‌تر از فهرستِ تصمیم یاد می‌گیرد، اما تنوعِ بیشتری دارد.</p>
 <figure class="fig"><img src="figures/ch19/fig-19-12.jpg" alt="شکل 19.12"><figcaption><strong>شکل ۱۹.۱۲ — منحنیِ یادگیری برای الگوریتمِ DECISION-LIST-LEARNING روی دادهٔ رستوران. منحنیِ LEARN-DECISION-TREE برای مقایسه نشان داده شده؛ درخت‌های تصمیم در این مسئلهٔ خاص کمی بهتر عمل می‌کنند. (هر دو روش پس از ۱۰۰ آزمایش بیش از ۹۰٪ دقت دارند.)</strong></figcaption></figure>
 <h2 id="sec-6">۱۹.۶ رگرسیون و رده‌بندیِ خطی</h2>
@@ -589,26 +589,26 @@ Gain(Type) = 1 − [(2/12)B(1/2) + (2/12)B(1/2) + (4/12)B(2/4) + (4/12)B(2/4)] =
 <figure class="fig"><img src="figures/ch19/fig-19-24.jpg" alt="شکل 19.24"><figcaption><strong>شکل ۱۹.۲۴ — الگوریتمِ تقویت چگونه کار می‌کند. هر مستطیلِ سایه‌دار با مثالی متناظر است؛ ارتفاعِ مستطیل با وزن متناظر است. تیک‌ها و ضربدرها نشان می‌دهند آیا مثال توسط فرضیهٔ کنونی درست رده‌بندی شده. اندازهٔ درختِ تصمیم وزنِ آن فرضیه را در گروهِ نهایی نشان می‌دهد.</strong></figcaption></figure>
 <p>الگوریتمِ خاصی به نامِ <span class="en-inline">ADABOOST</span> در شکل ۱۹.۲۵ نشان داده شده. معمولاً با درخت‌های تصمیم به‌عنوانِ فرضیه‌های مؤلفه‌ای اعمال می‌شود؛ اغلب درخت‌ها از نظرِ اندازه محدود می‌شوند.</p>
 <figure class="fig"><img src="figures/ch19/fig-19-25.jpg" alt="شکل 19.25"><figcaption><strong>شکل ۱۹.۲۵ — گونهٔ ADABOOST روشِ تقویت برای یادگیریِ گروهی. الگوریتم با وزن‌دهیِ مجددِ متوالیِ مثال‌های آموزشی فرضیه‌ها را تولید می‌کند. تابعِ WEIGHTED-MAJORITY فرضیه‌ای تولید می‌کند که مقدارِ خروجیِ با بالاترین رأی از فرضیه‌های h، با رأی‌های وزن‌گذاری‌شده با z، برمی‌گرداند. برای مسائلِ رگرسیون، یا برای رده‌بندیِ دودویی با دو ردهٔ -1 و 1، این ∑k h[k]·z[k] است.</strong></figcaption></figure>
-<pre class="code"><code>تابع ADABOOST(examples, L, K) فرضیه‌ای برمی‌گرداند
-  ورودی‌ها: examples، مجموعه‌ای از N مثالِ برچسب‌دار (x1,y1),...,(xN,yN)
-            L، الگوریتمِ یادگیری
-            K، شمارِ فرضیه‌ها در گروه
-  متغیرهای محلی: w، بردارِ N وزنِ مثال، در آغاز همه 1/N
-                 h، بردارِ K فرضیه
-                 z، بردارِ K وزنِ فرضیه
-                 ǫ ← عددِ مثبتِ کوچکی، برای اجتناب از تقسیم بر صفر
-  برای k از 1 تا K:
+<pre class="code"><code>function ADABOOST(examples, L, K) returns a hypothesis
+  inputs: examples, a set of N labeled examples (x1,y1),...,(xN,yN)
+          L, the learning algorithm
+          K, the number of hypotheses in the ensemble
+  local variables: w, a vector of N example weights, initially all 1/N
+                 h, a vector of K hypotheses
+                 z, a vector of K hypothesis weights
+                 ǫ ← a small positive number, to avoid division by zero
+  for k = 1 to K:
       h[k] ← L(examples, w)
       error ← 0
-      برای j از 1 تا N:                     // محاسبهٔ خطای کل برای h[k]
-          اگر h[k](xj) ≠ yj پس error ← error + w[j]
-      اگر error &gt; 1/2 پس break از حلقه
+      for j = 1 to N:                     // compute total error for h[k]
+          if h[k](xj) ≠ yj then error ← error + w[j]
+      if error &gt; 1/2 then break
       error ← min(error, 1 − ǫ)
-      برای j از 1 تا N:                     // به مثال‌هایی که h[k] اشتباه گرفت وزنِ بیشتری بده
-          اگر h[k](xj) = yj پس w[j] ← w[j] · error/(1 − error)
+      for j = 1 to N:                     // give more weight to examples misclassified by h[k]
+          if h[k](xj) = yj then w[j] ← w[j] · error/(1 − error)
       w ← NORMALIZE(w)
-      z[k] ← (1/2) log((1 − error)/error)   // به h[k] دقیق وزنِ بیشتری بده
-  بازگرداندن Function(x): ∑zi·hi(x)</code></pre>
+      z[k] ← (1/2) log((1 − error)/error)   // give more weight to accurate h[k]
+  return Function(x): ∑zi·hi(x)</code></pre>
 <p><span class="en-inline">ADABOOST</span> ویژگیِ بسیار مهمی دارد: اگر الگوریتمِ یادگیریِ ورودیِ L «الگوریتمِ یادگیریِ ضعیف» (Weak Learning Algorithm) باشد—بدان معنا که L همیشه فرضیه‌ای با دقتِ روی مجموعهٔ آموزشیِ کمی بهتر از حدسِ تصادفی برمی‌گرداند (یعنی برای رده‌بندیِ بولی ۵۰٪+ǫ)—آن‌گاه <span class="en-inline">ADABOOST</span> فرضیه‌ای برمی‌گرداند که برای K به‌اندازهٔ کافی بزرگ، دادهٔ آموزشی را کاملاً رده‌بندی می‌کند. بدین‌ترتیب، الگوریتم دقتِ الگوریتمِ یادگیریِ اصلی را روی دادهٔ آموزشی «تقویت» می‌کند. به بیانِ دیگر، تقویت می‌تواند بر هر میزانِ اریبی در مدلِ پایه غلبه کند، تا زمانی که مدلِ پایه ǫ بهتر از حدسِ تصادفی باشد. (در شبه‌کدِ ما، اگر فرضیه‌ای بدتر از تصادفی بگیریم تولیدِ فرضیه را متوقف می‌کنیم.) این نتیجه مهم نیست فضایِ فرضیهٔ اصلی چقدر نابیان باشد و مهم نیست تابعِ درحالِ‌یادگیری چقدر پیچیده باشد. فرمول‌های دقیقِ وزن‌ها در شکل ۱۹.۲۵ (با error/(1−error) و مانندِ آن) طوری انتخاب شده‌اند که اثباتِ این ویژگی آسان باشد (فرند و شاپایر، 1996 را ببینید). البته، این ویژگی دقت روی مثال‌های قبلاً دیده‌نشده را تضمین نمی‌کند.</p>
 <p>ببینیم تقویت روی دادهٔ رستوران چقدر خوب عمل می‌کند. به‌عنوانِ فضایِ فرضیهٔ اصلی‌مان ردهٔ «کنده‌های تصمیم» (Decision Stumps) را انتخاب می‌کنیم، که درخت‌های تصمیم با فقط یک آزمون، در ریشه‌اند. منحنیِ پایینی در شکل ۱۹.۲۶(الف) نشان می‌دهد کنده‌های تصمیمِ تقویت‌نشده برای این مجموعهٔ داده چندان مؤثر نیستند، و روی ۱۰۰ مثال آموزشی به عملکردِ پیش‌بینیِ فقط ۸۱٪ می‌رسند. وقتی تقویت اعمال می‌شود (با K = 5)، عملکرد بهتر است و پس از ۱۰۰ مثال به ۹۳٪ می‌رسد. اتفاقِ جالبی با افزایشِ اندازهٔ گروهِ K می‌افتد. شکل ۱۹.۲۶(ب) عملکردِ مجموعهٔ آموزشی (روی ۱۰۰ مثال) را به‌عنوانِ تابعی از K نشان می‌دهد. توجه کنید خطا وقتی K برابر 20 است به صفر می‌رسد؛ یعنی ترکیبِ وزن‌دار-اکثریتیِ ۲۰ کندهٔ تصمیم برای برازشِ دقیقِ ۱۰۰ مثال کافی است—این نقطهٔ درون‌یابی است. با افزودنِ کنده‌های بیشتر به گروه، خطا در صفر می‌ماند. نمودار همچنین نشان می‌دهد عملکردِ مجموعهٔ آزمون مدت‌ها پس از رسیدنِ خطایِ مجموعهٔ آموزشی به صفر همچنان افزایش می‌یابد. در <span class="en-inline">K = 20</span>، عملکردِ آزمون 0.95 است (یا خطای 0.05)، و عملکرد تا دیرترِ <span class="en-inline">K = 137</span> به 0.98 افزایش می‌یابد، قبل از اینکه به‌تدریج به 0.95 افت کند.</p>
 <figure class="fig"><img src="figures/ch19/fig-19-26.jpg" alt="شکل 19.26"><figcaption><strong>شکل ۱۹.۲۶ — (الف) نموداری که عملکردِ کنده‌های تصمیمِ تقویت‌شده با K = 5 را در برابرِ کنده‌های تصمیمِ تقویت‌نشده روی دادهٔ رستوران نشان می‌دهد. (ب) نسبتِ درست روی مجموعهٔ آموزشی و مجموعهٔ آزمون به‌عنوانِ تابعی از K، شمارِ فرضیه‌ها در گروه. توجه کنید دقتِ مجموعهٔ آزمون حتی پس از رسیدنِ دقتِ آموزشی به 1، یعنی پس از برازشِ دقیقِ داده توسط گروه، کمی بهبود می‌یابد.</strong></figcaption></figure>

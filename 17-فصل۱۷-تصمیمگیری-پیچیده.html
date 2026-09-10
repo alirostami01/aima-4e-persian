@@ -196,8 +196,8 @@
 <pre class="code"><code>Q(s,a) = ∑s′ P(s′|s,a) [R(s,a,s′) + γ U(s′)]
        = ∑s′ P(s′|s,a) [R(s,a,s′) + γ max_{a′} Q(s′,a′)]        (17.8)</code></pre>
 <p>حلِ معادله‌های بلمن برای U (یا برای Q) آنچه برای یافتنِ سیاستِ بهینه نیاز داریم به ما می‌دهد. تابعِ Q بارها و بارها در الگوریتم‌های حلِ <span class="en-inline">MDP</span>ها ظاهر می‌شود، پس از تعریفِ زیر استفاده می‌کنیم:</p>
-<pre class="code"><code>تابع Q-VALUE(mdp, s, a, U) مقدارِ مطلوبیتی برمی‌گرداند
-    بازگرداندن ∑s′ P(s′|s,a) [R(s,a,s′) + γ U[s′]]</code></pre>
+<pre class="code"><code>function Q-VALUE(mdp, s, a, U) returns a utility value
+    return ∑s′ P(s′|s,a) [R(s,a,s′) + γ U[s′]]</code></pre>
 <h3>۱۷.۱.۳ مقیاس‌های پاداش</h3>
 <p>فصل ۱۶ اشاره کرد مقیاسِ مطلوبیت‌ها دلبخواه است: تبدیلِ وابسته، تصمیمِ بهینه را تغییر نمی‌دهد. می‌توانیم <span class="en-inline">U(s)</span> را با <span class="en-inline">U′(s) = mU(s) + b</span> جایگزین کنیم، که در آن m و b ثابت‌های دلخواه با <span class="en-inline">m &gt; 0</span> هستند. از تعریفِ مطلوبیت‌ها به‌عنوانِ جمع‌های تنزیل‌شدهٔ پاداش‌ها، به‌آسانی دیده می‌شود تبدیلِ مشابهی از پاداش‌ها سیاستِ بهینه را در <span class="en-inline">MDP</span> تغییر نمی‌دهد:</p>
 <pre class="code"><code>R′(s,a,s′) = mR(s,a,s′) + b</code></pre>
@@ -242,19 +242,19 @@
 <pre class="code"><code>Ui+1(s) ← max_{a∈A(s)} ∑s′ P(s′|s,a) [R(s,a,s′) + γUi(s′)]        (17.10)</code></pre>
 <p>که در آن فرض می‌شود به‌روزرسانی در هر تکرار هم‌زمان به همهٔ حالت‌ها اعمال می‌شود. اگر به‌روزرسانیِ بلمن را بی‌نهایت بار اعمال کنیم، تضمین‌شده به تعادلی می‌رسیم («همگراییِ تکرارِ مقدار» را در زیر ببینید)، که در آن صورت مقادیرِ نهاییِ مطلوبیت باید راه‌حل‌های معادله‌های بلمن باشند. در واقع، آن‌ها همچنین راه‌حل‌های یکتایند، و سیاستِ متناظر (به‌دست‌آمده با معادلهٔ (17.4)) بهینه است. الگوریتمِ مفصل، شاملِ شرطِ خاتمه وقتی مطلوبیت‌ها «به‌اندازهٔ کافی نزدیک‌اند»، در شکل ۱۷.۶ نشان داده شده.</p>
 <figure class="fig"><img src="figures/ch17/fig-17-6.jpg" alt="شکل 17.6"><figcaption><strong>شکل ۱۷.۶ — الگوریتمِ تکرارِ مقدار برای محاسبهٔ مطلوبیت‌های حالت‌ها. شرطِ خاتمه از معادلهٔ (17.12) است.</strong></figcaption></figure>
-<pre class="code"><code>تابع VALUE-ITERATION(mdp, ǫ) تابعِ مطلوبیتی برمی‌گرداند
-  ورودی‌ها: mdp، MDP با حالت‌های S، کنش‌های A(s)، مدلِ انتقالِ P(s′|s,a)،
-                 پاداش‌های R(s,a,s′)، تنزیلِ γ
-            ǫ، بیشینهٔ خطای مجاز در مطلوبیتِ هر حالت
-  متغیرهای محلی: U، U′، بردارهای مطلوبیت برای حالت‌های در S، در آغاز صفر
-                 δ، بیشینهٔ تغییرِ نسبی در مطلوبیتِ هر حالت
-  تکرار:
+<pre class="code"><code>function VALUE-ITERATION(mdp, ǫ) returns a utility function
+  inputs: mdp، an MDP with states S, actions A(s), transition model P(s′|s,a),
+                 rewards R(s,a,s′), discount γ
+            ǫ، the maximum allowed error in the utility of any state
+  local variables: U، U′، utility vectors for states in S, initially zero
+                 δ، the maximum change in the utility of any state
+  repeat:
       U ← U′؛ δ ← 0
-      برای هر حالتِ s در S:
+      for each state s in S:
           U′[s] ← max_{a∈A(s)} Q-VALUE(mdp, s, a, U)
-          اگر |U′[s] − U[s]| &gt; δ پس δ ← |U′[s] − U[s]|
-  تا وقتی δ ≤ ǫ(1−γ)/γ
-  بازگرداندن U</code></pre>
+          if |U′[s] − U[s]| &gt; δ then δ ← |U′[s] − U[s]|
+  until δ ≤ ǫ(1−γ)/γ
+  return U</code></pre>
 <p>می‌توانیم تکرارِ مقدار را بر جهانِ 4×3 در شکل ۱۷.۱(الف) اعمال کنیم. با شروع از مقادیرِ اولیهٔ صفر، مطلوبیت‌ها چنان تکامل می‌یابند که در شکل ۱۷.۷(الف) نشان داده شده. توجه کنید حالت‌های با فاصله‌های مختلف از (4,3) چگونه پاداشِ منفی جمع می‌کنند تا وقتی مسیری به (4,3) یافت شود، و سپس مطلوبیت‌ها شروع به افزایش می‌کنند. می‌توانیم الگوریتمِ تکرارِ مقدار را به‌عنوانِ انتشارِ اطلاعات در فضایِ حالت از طریقِ به‌روزرسانی‌های محلی بدانیم.</p>
 <figure class="fig"><img src="figures/ch17/fig-17-7.jpg" alt="شکل 17.7"><figcaption><strong>شکل ۱۷.۷ — (الف) نموداری که تکاملِ مطلوبیت‌های حالت‌های برگزیده را با تکرارِ مقدار نشان می‌دهد. (ب) شمارِ تکرارهایِ مقدارِ لازم برای تضمینِ خطایی حداکثر ǫ = c·Rmax، برای مقادیرِ مختلفِ c، به‌عنوانِ تابعی از عاملِ تنزیلِ γ.</strong></figcaption></figure>
 <p><strong>همگراییِ تکرارِ مقدار.</strong> گفتیم تکرارِ مقدار سرانجام به مجموعهٔ یکتایی از راه‌حل‌های معادله‌های بلمن همگرا می‌شود. در این بخش توضیح می‌دهیم چرا این اتفاق می‌افتد. در طولِ مسیر ایده‌های ریاضیِ مفیدی معرفی می‌کنیم، و روش‌هایی برای ارزیابیِ خطای تابعِ مطلوبیتِ بازگردانده‌شده وقتی الگوریتم زودتر خاتمه می‌یابد به دست می‌آوریم؛ این مفید است، زیرا بدان معناست لازم نیست برای همیشه اجرا کنیم. این بخش نسبتاً فنی است.</p>
@@ -287,19 +287,19 @@
 </ul>
 <p>الگوریتم وقتی خاتمه می‌یابد که گامِ بهبودِ سیاست هیچ تغییری در مطلوبیت‌ها ندهد. در این نقطه، می‌دانیم تابعِ مطلوبیتِ <span class="en-inline">Ui</span> نقطهٔ ثابتِ به‌روزرسانیِ بلمن است، پس راه‌حلِ معادله‌های بلمن است، و πi باید سیاستِ بهینه باشد. چون برای فضایِ حالتِ متناهی فقط شمارِ متناهی سیاست هست، و می‌توان نشان داد هر تکرار سیاستِ بهتری می‌دهد، تکرارِ سیاست باید خاتمه یابد. الگوریتم در شکل ۱۷.۹ نشان داده شده. مانندِ تکرارِ مقدار، از تابعِ <span class="en-inline">Q-VALUE</span> تعریف‌شده در صفحهٔ ۵۶۹ استفاده می‌کنیم.</p>
 <figure class="fig"><img src="figures/ch17/fig-17-9.jpg" alt="شکل 17.9"><figcaption><strong>شکل ۱۷.۹ — الگوریتمِ تکرارِ سیاست برای محاسبهٔ سیاستِ بهینه.</strong></figcaption></figure>
-<pre class="code"><code>تابع POLICY-ITERATION(mdp) سیاستی برمی‌گرداند
-  ورودی‌ها: mdp، MDP با حالت‌های S، کنش‌های A(s)، مدلِ انتقالِ P(s′|s,a)
-  متغیرهای محلی: U، بردارِ مطلوبیت‌ها برای حالت‌های در S، در آغاز صفر
-                 π، بردارِ سیاستِ نمایه‌شده با حالت، در آغاز تصادفی
-  تکرار:
+<pre class="code"><code>function POLICY-ITERATION(mdp) returns a policy
+  inputs: mdp, an MDP with states S, actions A(s), transition model P(s′|s,a)
+  local variables: U, a utility vector for states in S, initially zero
+                 π, a state-indexed policy vector, initially random
+  repeat:
       U ← POLICY-EVALUATION(π, U, mdp)
       unchanged? ← true
-      برای هر حالتِ s در S:
+      for each state s in S:
           a* ← argmax_{a∈A(s)} Q-VALUE(mdp, s, a, U)
-          اگر Q-VALUE(mdp, s, a*, U) &gt; Q-VALUE(mdp, s, π[s], U)
-              پس π[s] ← a*؛ unchanged? ← false
-  تا وقتی unchanged?
-  بازگرداندن π</code></pre>
+          if Q-VALUE(mdp, s, a*, U) &gt; Q-VALUE(mdp, s, π[s], U)
+              then π[s] ← a*; unchanged? ← false
+  until unchanged?
+  return π</code></pre>
 <p><span class="en-inline">POLICY-EVALUATION</span> را چگونه پیاده‌سازی کنیم؟ معلوم می‌شود انجامِ این ساده‌تر از حلِ معادله‌های بلمنِ استاندارد است (که تکرارِ مقدار انجام می‌دهد)، زیرا کنش در هر حالت توسط سیاست ثابت شده. در i-امین تکرار، سیاستِ πi کنشِ π<span class="en-inline">i(s)</span> را در حالتِ s مشخص می‌کند. این بدان معناست نسخهٔ ساده‌شده‌ای از معادلهٔ بلمن (17.5) داریم که مطلوبیتِ s (تحتِ πi) را به مطلوبیت‌های همسایه‌هایش مرتبط می‌کند:</p>
 <pre class="code"><code>Ui(s) = ∑s′ P(s′|s, πi(s)) [R(s, πi(s), s′) + γUi(s′)]        (17.14)</code></pre>
 <p>برای نمونه، فرض کنیم πi سیاستِ نشان‌داده‌شده در شکل ۱۷.۲(الف) باشد. سپس π<span class="en-inline">i(1,1) = Up</span>، π<span class="en-inline">i(1,2) = Up</span> و مانندِ آن داریم، و معادله‌های بلمنِ ساده‌شده عبارت‌اند از:</p>
@@ -440,19 +440,19 @@ U(M1) = ∑_{t=0}^{∞} 0.5ᵗ = 2.0</code></pre>
 <pre class="code"><code>αp(s) = ∑s′ P(s′|s,a) [R(s,a,s′) + γ ∑e P(e|s′) αp.e(s′)]        (17.18)</code></pre>
 <p>این بازگشت به‌طورِ طبیعی الگوریتمِ تکرارِ مقداری به ما می‌دهد، که در شکل ۱۷.۱۶ داده شده.</p>
 <figure class="fig"><img src="figures/ch17/fig-17-16.jpg" alt="شکل 17.16"><figcaption><strong>شکل ۱۷.۱۶ — طرحِ سطح‌بالای الگوریتمِ تکرارِ مقدار برای POMDPها.</strong></figcaption></figure>
-<pre class="code"><code>تابع POMDP-VALUE-ITERATION(pomdp, ǫ) تابعِ مطلوبیتی برمی‌گرداند
-  ورودی‌ها: pomdp، POMDP با حالت‌های S، کنش‌های A(s)، مدلِ انتقالِ P(s′|s,a)،
-                 مدلِ حسگرِ P(e|s)، پاداش‌های R(s)، تنزیلِ γ
-            ǫ، بیشینهٔ خطای مجاز در مطلوبیتِ هر حالت
-  متغیرهای محلی: U، U′، مجموعه‌هایی از برنامه‌های p با بردارهای مطلوبیتِ مرتبطِ αp
-  U′ ← مجموعه‌ای شاملِ فقط برنامهٔ خالیِ []، با α[](s) = R(s)
-  تکرار:
+<pre class="code"><code>function POMDP-VALUE-ITERATION(pomdp, ǫ) returns a utility function
+  inputs: pomdp, a POMDP with states S, actions A(s), transition model P(s′|s,a),
+                 sensor model P(e|s), rewards R(s), discount γ
+          ǫ, the maximum allowed error in the utility of any state
+  local variables: U, U′, sets of plans p with associated utility vectors αp
+  U′ ← a set containing only the empty plan [], with α[](s) = R(s)
+  repeat:
       U ← U′
-      U′ ← مجموعهٔ همهٔ برنامه‌های شاملِ کنشی و، برای هر حس‌گذارِهٔ ممکنِ بعدی،
-           برنامه‌ای در U، با بردارهای مطلوبیتِ محاسبه‌شده طبقِ معادلهٔ (17.18)
+      U′ ← the set of all plans consisting of an action and, for each possible next percept,
+           a plan in U, with utility vectors computed according to Equation (17.18)
       U′ ← REMOVE-DOMINATED-PLANS(U′)
-  تا وقتی MAX-DIFFERENCE(U, U′) ≤ ǫ(1−γ)/γ
-  بازگرداندن U</code></pre>
+  until MAX-DIFFERENCE(U, U′) ≤ ǫ(1−γ)/γ
+  return U</code></pre>
 <p>ساختارِ الگوریتم و تحلیلِ خطایش شبیهِ الگوریتمِ پایهٔ تکرارِ مقدار در شکل ۱۷.۶ صفحهٔ ۵۷۳ است؛ تفاوتِ اصلی این است که به‌جای محاسبهٔ یک عددِ مطلوبیت برای هر حالت، <span class="en-inline">POMDP-VALUE-ITERATION</span> مجموعه‌ای از برنامه‌های مسلط‌نشده را با ابرصفحه‌های مطلوبیتشان نگه می‌دارد.</p>
 <p>پیچیدگیِ الگوریتم عمدتاً به چند برنامه تولید می‌شود بستگی دارد. با |A| کنش و |E| مشاهدهٔ ممکن، |A|^O(|E|^(d−1)) برنامهٔ متمایزِ عمق-d هست. حتی برای جهانِ فروتنِ دوحالته با <span class="en-inline">d = 8</span>، این 2²<sup>⁵⁵</sup> برنامه است. حذفِ برنامه‌های مسلط برای کاهشِ این رشدِ دوتاییِ نمایی ضروری است: شمارِ برنامه‌های مسلط‌نشده با <span class="en-inline">d = 8</span> فقط ۱۴۴ است. تابعِ مطلوبیت برای این ۱۴۴ برنامه در شکل ۱۷.۱۵(د) نشان داده شده.</p>
 <p>توجه کنید حالت‌های باورِ میانی ارزشِ کمتری از حالتِ A و حالتِ B دارند، زیرا در حالت‌های میانی عامل فاقدِ اطلاعاتِ لازم برای انتخابِ کنشِ خوب است. به همین دلیل است که اطلاعات در معنایِ تعریف‌شده در بخش ۱۶.۶ ارزش دارد و سیاست‌های بهینه در <span class="en-inline">POMDP</span>ها اغلب شاملِ کنش‌های جمع‌آوریِ اطلاعات‌اند.</p>

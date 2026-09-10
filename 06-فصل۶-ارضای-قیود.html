@@ -209,11 +209,11 @@
 <p>اگر <span class="en-inline">Di</span> به هیچ بازبینی شود، می‌دانیم کل <span class="en-inline">CSP</span> هیچ راه‌حل سازگاری ندارد و <span class="en-inline">AC-3</span> می‌تواند بلافاصله شکست بازگرداند. وگرنه، به بررسی ادامه می‌دهیم و می‌کوشیم مقادیری را از دامنه‌های متغیرها حذف کنیم تا آنکه دیگر کمانی در صف نماند. در آن نقطه، با <span class="en-inline">CSP</span>ی روبه‌روییم که با <span class="en-inline">CSP</span> اصلی هم‌ارز است — هر دو راه‌حل‌های یکسانی دارند — اما <span class="en-inline">CSP</span> سازگار-کمانی سریع‌تر جستجو خواهد شد، زیرا متغیرهایش دامنه‌های کوچک‌تری دارند. در برخی موارد، مسئله را کامل حل می‌کند (با کاهش هر دامنه به اندازهٔ ۱) و در موارد دیگر اثبات می‌کند هیچ راه‌حلی نیست (با کاهش دامنه‌ای به اندازهٔ ۰).</p>
 <figure class="fig"><img src="figures/ch06/fig-6-3.jpg" alt="شکل 6.3"><figcaption><strong>شکل 6.3 — الگوریتم سازگاری کمانی AC-3.</strong> پس از اعمال <span class="en-inline">AC-3</span>، یا هر کمان سازگار-کمانی است، یا متغیری دامنهٔ خالی دارد که نشان می‌دهد <span class="en-inline">CSP</span> قابل حل نیست. نام «<span class="en-inline">AC-3</span>» توسط مخترع الگوریتم (مک‌ورث، ۱۹۷۷) به کار رفت، زیرا سومین نسخه‌ای بود که در آن مقاله توسعه یافت.</figcaption></figure>
 <pre class="code"><code>function AC-3(csp) returns false if an inconsistency is found and true otherwise
-  queue ← صفی از کمان‌ها، در آغاز همهٔ کمان‌های csp
-  while queue خالی نیست do
+  queue ← a queue of arcs, initially all the arcs in csp
+  while queue is not empty do
     (Xi, Xj) ← POP(queue)
     if REVISE(csp, Xi, Xj) then
-      if اندازهٔ Di = 0 then return false
+      if size of Di = 0 then return false
       for each Xk in Xi.NEIGHBORS - {Xj} do
         add (Xk, Xi) to queue
   return true
@@ -221,7 +221,7 @@
 function REVISE(csp, Xi, Xj) returns true iff we revise the domain of Xi
   revised ← false
   for each x in Di do
-    if هیچ مقدار y در Dj اجازه نمی‌دهد (x,y) قید میان Xi و Xj را برآورده کند then
+    if no value y in Dj allows (x,y) to satisfy the constraint between Xi and Xj then
       delete x from Di
       revised ← true
   return revised</code></pre>
@@ -264,18 +264,17 @@ function REVISE(csp, Xi, Xj) returns true iff we revise the domain of Xi
   return BACKTRACK(csp, {})
 
 function BACKTRACK(csp, assignment) returns a solution or failure
-  if assignment کامل است then return assignment
+  if assignment is complete then return assignment
   var ← SELECT-UNASSIGNED-VARIABLE(csp, assignment)
   for each value in ORDER-DOMAIN-VALUES(csp, var, assignment) do
-    if value با assignment سازگار است then
+    if value is consistent with assignment then
       add {var = value} to assignment
       inferences ← INFERENCE(csp, var, assignment)
       if inferences ≠ failure then
-        add inferences to csp
+        add inferences to assignment
         result ← BACKTRACK(csp, assignment)
         if result ≠ failure then return result
-        remove inferences from csp
-      remove {var = value} from assignment
+      remove {var = value} and inferences from assignment
   return failure</code></pre>
 <figure class="fig"><img src="figures/ch06/fig-6-6.jpg" alt="شکل 6.6"><figcaption><strong>شکل 6.6 — بخشی از درخت جستجو برای مسئلهٔ رنگ‌آمیزی نقشه در شکل 6.1.</strong></figcaption></figure>
 <p>در حالی که الگوریتم‌های جستجوی نامطلع فصل ۳ فقط با عرضهٔ اکتشافی‌های حوزه‌ویژه بهبود می‌یافتند، معلوم می‌شود جستجوی عقبگرد را می‌توان با اکتشافی‌های مستقل از حوزه بهبود داد که از بازنمایی عاملی <span class="en-inline">CSP</span>ها بهره می‌گیرند. در چهار بخش زیر نشان می‌دهیم چگونه:</p>
@@ -321,13 +320,13 @@ function BACKTRACK(csp, assignment) returns a solution or failure
 <figure class="fig"><img src="figures/ch06/fig-6-8.jpg" alt="شکل 6.8"><figcaption><strong>شکل 6.8 — راه‌حل دومرحله‌ای با کمترین-تعارض برای مسئلهٔ هشت‌وزیر.</strong> در هر مرحله، وزیری برای تخصیص دوباره در ستونش برگزیده می‌شود. شمار تعارض‌ها (در این مورد، شمار وزیرهای حمله‌کننده) در هر خانه نشان داده شده. الگوریتم وزیر را به خانهٔ کمترین-تعارض می‌برد و تساوی‌ها را تصادفی می‌شکند.</figcaption></figure>
 <figure class="fig"><img src="figures/ch06/fig-6-9.jpg" alt="شکل 6.9"><figcaption><strong>شکل 6.9 — الگوریتم جستجوی محلی MIN-CONFLICTS برای CSPها.</strong> حالت آغازین را می‌توان تصادفی یا با فرایند تخصیص حریصانه‌ای که برای هر متغیر به‌نوبت مقدار کمترین-تعارض را برمی‌گزیند انتخاب کرد. تابع <span class="en-inline">CONFLICTS</span> شمار قیدهای نقض‌شده توسط مقدارِ خاص را با توجه به بقیهٔ تخصیص کنونی می‌شمارد.</figcaption></figure>
 <pre class="code"><code>function MIN-CONFLICTS(csp, max steps) returns a solution or failure
-  inputs: csp، یک مسئلهٔ ارضای قیود
-          max steps، شمار گام‌های مجاز پیش از دست‌کشیدن
-  current ← یک تخصیص کامل آغازین برای csp
+  inputs: csp، a constraint satisfaction problem
+          max steps، the maximum number of steps before giving up
+  current ← an initial complete assignment for csp
   for i = 1 to max steps do
-    if current راه‌حلی برای csp است then return current
-    var ← یک متغیر درتعارضِ تصادفی‌برگزیده از csp.VARIABLES
-    value ← مقدار v برای var که CONFLICTS(csp, var, v, current) را کمینه می‌کند
+    if current is a solution for csp then return current
+    var ← a randomly selected conflicted variable from csp.VARIABLES
+    value ← a value v for var that minimizes CONFLICTS(csp, var, v, current)
     set var = value in current
   return failure</code></pre>
 <p>کمترین-تعارض برای بسیاری از <span class="en-inline">CSP</span>ها به‌شکل شگفت‌آوری مؤثر است. به‌طرز حیرت‌آوری، در مسئلهٔ n-وزیر، اگر جای‌گذاری آغازین وزیرها را نشمارید، زمان اجرای کمترین-تعارض تقریباً مستقل از اندازهٔ مسئله است. حتی مسئلهٔ میلیون-وزیر را به‌طور میانگین در ۵۰ گام حل می‌کند (پس از تخصیص آغازین). این مشاهدهٔ چشمگیر محرک پژوهش‌های فراوانی در دههٔ ۱۹۹۰ دربارهٔ جستجوی محلی و تمایز میان مسائل آسان و سخت شد، که در بخش 7.6.3 به آن می‌پردازیم. به بیان تقریبی، n-وزیر برای جستجوی محلی آسان است، زیرا راه‌حل‌ها به‌صورت چگال در سراسر فضای حالت توزیع شده‌اند. کمترین-تعارض همچنین برای مسائل سخت خوب کار می‌کند. برای نمونه، برای زمان‌بندی مشاهده‌های تلسکوپ فضایی هابل استفاده شده و زمان زمان‌بندی یک هفته مشاهده را از سه هفته (!) به حدود ۱۰ دقیقه کاهش داده است.</p>
@@ -343,17 +342,17 @@ function BACKTRACK(csp, assignment) returns a solution or failure
 <figure class="fig"><img src="figures/ch06/fig-6-10.jpg" alt="شکل 6.10"><figcaption><strong>شکل 6.10 — (الف) گراف قید یک CSP درخت‌ساختار. (ب) ترتیب خطی متغیرها سازگار با درخت با A به‌عنوان ریشه. این به‌عنوان مرتب‌سازی توپولوژیک متغیرها شناخته می‌شود.</strong></figcaption></figure>
 <figure class="fig"><img src="figures/ch06/fig-6-11.jpg" alt="شکل 6.11"><figcaption><strong>شکل 6.11 — الگوریتم TREE-CSP-SOLVER برای حل CSPهای درخت‌ساختار.</strong> اگر <span class="en-inline">CSP</span> راه‌حلی داشته باشد، آن را در زمان خطی خواهیم یافت؛ اگر نه، تناقضی تشخیص خواهیم داد.</figcaption></figure>
 <pre class="code"><code>function TREE-CSP-SOLVER(csp) returns a solution, or failure
-  inputs: csp، یک CSP با مؤلفه‌های X، D، C
-  n ← شمار متغیرها در X
-  assignment ← یک تخصیص خالی
-  root ← هر متغیری در X
+  inputs: csp، a CSP with components X, D, C
+  n ← number of variables in X
+  assignment ← an empty assignment
+  root ← any variable in X
   X ← TOPOLOGICAL-SORT(X, root)
   for j = n down to 2 do
     MAKE-ARC-CONSISTENT(PARENT(Xj), Xj)
-    if نمی‌توان آن را سازگار کرد then return failure
+    if it cannot be made consistent then return failure
   for i = 1 to n do
-    assignment[Xi] ← هر مقدار سازگاری از Di
-    if هیچ مقدار سازگاری نیست then return failure
+    assignment[Xi] ← any consistent value from Di
+    if there is no consistent value then return failure
   return assignment</code></pre>
 <p>حال که الگوریتم کارآمدی برای درخت‌ها داریم، می‌توانیم در نظر بگیریم آیا گراف‌های قید عمومی‌تر را می‌توان به‌نحوی به درخت تقلیل داد. دو راه برای این کار هست: با حذف گره‌ها (بخش 6.5.1) یا با فروریختن گره‌ها در هم (بخش 6.5.2).</p>
 <h3>6.5.1 شرطی‌سازی مجموعه‌برش</h3>

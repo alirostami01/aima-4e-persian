@@ -318,22 +318,22 @@ P(c | h, ¬subsidy)   = N(c; af·h + bf, σf²)  = 1/(σf√2π) · e^(−(1/2)(
 <p>یعنی شانسِ سرقت، با توجه به تماسِ هر دو همسایه، حدود ۲۸٪ است.</p>
 <p>الگوریتمِ <span class="en-inline">ENUMERATION-ASK</span> در شکل ۱۳.۱۱ این درخت‌های عبارت را با بازگشتِ عمق-اولِ چپ-به-راست ارزیابی می‌کند. الگوریتم از نظرِ ساختار بسیار شبیهِ الگوریتمِ پس‌گرد برای حلِ <span class="en-inline">CSP</span>ها (شکل ۶.۵) و الگوریتمِ <span class="en-inline">DPLL</span> برای ارضاپذیری (شکل ۷.۱۷) است. پیچیدگیِ فضایی‌اش فقط در شمارِ متغیرها خطی است: الگوریتم روی توزیعِ مشترکِ کامل جمع می‌زند بدون آنکه هرگز آن را صریحاً بسازد. متأسفانه، پیچیدگیِ زمانی‌اش برای شبکه‌ای با n متغیرِ بولی (بدونِ شمردنِ متغیرهای شاهد) همیشه O(2ⁿ) است—بهتر از O(n2ⁿ) رویکردِ سادهٔ توصیف‌شدهٔ پیشین، اما همچنان نسبتاً ناخوشایند. برای شبکهٔ بیمه در شکل ۱۳.۹، که نسبتاً کوچک است، استنتاجِ دقیق با شمارش برای پرس‌وجوی نمونه‌ای روی متغیرهای هزینه حدود ۲۲۷ میلیون عملیاتِ حسابی لازم دارد. اگر به درختِ شکل ۱۳.۱۰ با دقت نگاه کنید، با این حال، خواهید دید شاملِ زیرعبارت‌های تکراری است. حاصل‌ضرب‌های <span class="en-inline">P(j|a)P(m|a)</span> و P(j|¬<span class="en-inline">a)P(m</span>|¬a) دو بار محاسبه می‌شوند، یک بار برای هر مقدارِ <span class="en-inline">E.</span> کلیدِ استنتاجِ کارآمد در شبکه‌های بیز پرهیز از چنین محاسبه‌های هدررفته‌ای است. بخشِ بعد روشی عمومی برای این کار توصیف می‌کند.</p>
 <figure class="fig"><img src="figures/ch13/fig-13-10.jpg" alt="شکل 13.10"><figcaption><strong>شکل ۱۳.۱۰ — ساختارِ عبارتِ نشان‌داده‌شده در معادلهٔ (13.5). ارزیابی از بالا به پایین پیش می‌رود، مقادیر را در طولِ هر مسیر ضرب می‌کند و در گره‌های «+» جمع می‌زند. تکرارِ مسیرهای j و m را توجه کنید.</strong></figcaption></figure>
-<pre class="code"><code>تابع ENUMERATION-ASK(X, e, bn) توزیعی روی X برمی‌گرداند
-  ورودی‌ها: X، متغیرِ پرس‌وجو
-            e، مقادیرِ مشاهده‌شده برای متغیرهای E
-            bn، شبکهٔ بیزی با متغیرهای vars
-  Q(X) ← توزیعی روی X، در آغاز خالی
-  برای هر مقدارِ xi از X:
-      Q(xi) ← ENUMERATE-ALL(vars, exi)     که در آن exi همان e است با افزودنِ X = xi
-  بازگرداندن NORMALIZE(Q(X))
+<pre class="code"><code>function ENUMERATION-ASK(X, e, bn) returns a distribution over X
+  inputs: X, the query variable
+          e, observed values for the variables E
+          bn, a Bayesian network with variables vars
+  Q(X) ← a distribution over X, initially empty
+  for each value xi of X:
+      Q(xi) ← ENUMERATE-ALL(vars, exi)     where exi is the same as e with X = xi added
+  return NORMALIZE(Q(X))
 
-تابع ENUMERATE-ALL(vars, e) عددی حقیقی برمی‌گرداند
-  اگر EMPTY?(vars) پس بازگرداندن 1.0
+function ENUMERATE-ALL(vars, e) returns a real number
+  if EMPTY?(vars) then return 1.0
   V ← FIRST(vars)
-  اگر V متغیرِ شاهد با مقدارِ v در e است
-      پس بازگرداندن P(v | parents(V)) × ENUMERATE-ALL(REST(vars), e)
-      وگرنه بازگرداندن ∑v P(v | parents(V)) × ENUMERATE-ALL(REST(vars), ev)
-           که در آن ev همان e است با افزودنِ V = v</code></pre>
+  if V is an evidence variable with value v in e
+      then return P(v | parents(V)) × ENUMERATE-ALL(REST(vars), e)
+      else return ∑v P(v | parents(V)) × ENUMERATE-ALL(REST(vars), ev)
+           where ev is the same as e with V = v added</code></pre>
 <figure class="fig"><img src="figures/ch13/fig-13-11.jpg" alt="شکل 13.11"><figcaption><strong>شکل ۱۳.۱۱ — الگوریتمِ شمارش برای استنتاجِ دقیق در شبکه‌های بیز.</strong></figcaption></figure>
 <h3>۱۳.۳.۲ الگوریتمِ حذفِ متغیر</h3>
 <p>الگوریتمِ شمارش را می‌توان با حذفِ محاسبه‌های تکراریِ از نوعِ نشان‌داده‌شده در شکل ۱۳.۱۰ به‌طورِ قابلِ‌ملاحظه‌ای بهبود داد. ایده ساده است: محاسبه را یک بار انجام بده و نتایج را برای استفادهٔ بعدی ذخیره کن. این نوعی «برنامه‌نویسیِ پویا» (Dynamic Programming) است. چند نسخه از این رویکرد هست؛ ما «الگوریتمِ حذفِ متغیر» (Variable Elimination) را ارائه می‌کنیم که ساده‌ترین است. حذفِ متغیر با ارزیابیِ عبارت‌هایی مانند معادلهٔ (13.5) در ترتیبِ راست-به-چپ (یعنی از پایین به بالا در شکل ۱۳.۱۰) کار می‌کند. نتایجِ میانی ذخیره می‌شوند و جمع‌زدن روی هر متغیر فقط برای آن بخش‌هایی از عبارت انجام می‌شود که به متغیر وابسته‌اند. این فرایند را برای شبکهٔ سرقت نشان می‌دهیم. عبارتِ <span class="en-inline">P(B|j,m)</span> را ارزیابی می‌کنیم:</p>
@@ -367,16 +367,16 @@ f5(A) = ⟨P(m|a), P(m|¬a)⟩ = ⟨0.70, 0.01⟩</code></pre>
 <p>با ارزیابیِ این عبارت از راست به چپ، نکتهٔ جالبی می‌بینیم: ∑<span class="en-inline">m P(m|a)</span> طبقِ تعریف برابر ۱ است! از این رو، اصلاً نیازی به گنجاندنش نبود؛ متغیرِ M برای این پرس‌وجو نامربوط است. راهِ دیگرِ گفتنِ این اینکه نتیجهٔ پرس‌وجوی <span class="en-inline">P(JohnCalls | Burglary=true)</span> اگر <span class="en-inline">MaryCalls</span> را کلاً از شبکه حذف کنیم تغییر نمی‌کند. به‌طورِ کلی، می‌توانیم هر گرهٔ برگی را که متغیرِ پرس‌وجو یا شاهد نیست حذف کنیم. پس از حذفِ آن، ممکن است گره‌های برگیِ بیشتری باشند، و آن‌ها نیز ممکن است نامربوط باشند. با ادامهٔ این فرایند، سرانجام درمی‌یابیم هر متغیری که نیای متغیرِ پرس‌وجو یا شاهد نیست برای پرس‌وجو نامربوط است. الگوریتمِ حذفِ متغیر بنابراین می‌تواند همهٔ این متغیرها را قبل از ارزیابیِ پرس‌وجو حذف کند.</p>
 <p>وقتی روی شبکهٔ بیمهٔ نشان‌داده‌شده در شکل ۱۳.۹ اعمال شود، حذفِ متغیر بهبودِ قابلِ‌ملاحظه‌ای بر الگوریتمِ شمارشِ ساده‌لوحانه نشان می‌دهد. با استفاده از ترتیبِ توپولوژیکِ معکوس برای متغیرها، استنتاجِ دقیق با حذف حدود ۱٬۰۰۰ برابر سریع‌تر از الگوریتمِ شمارش است.</p>
 <figure class="fig"><img src="figures/ch13/fig-13-13.jpg" alt="شکل 13.13"><figcaption><strong>شکل ۱۳.۱۳ — الگوریتمِ حذفِ متغیر برای استنتاجِ دقیق در شبکه‌های بیز.</strong></figcaption></figure>
-<pre class="code"><code>تابع ELIMINATION-ASK(X, e, bn) توزیعی روی X برمی‌گرداند
-  ورودی‌ها: X، متغیرِ پرس‌وجو
-            e، رخدادِ مشاهده‌شده (تخصیصی از مقادیر به متغیرهای شاهد)
-            bn، شبکهٔ بیزی با متغیرهای vars و CPTها
-  عوامل ← []
-  برای هر متغیرِ V در ORDER(vars):
-      عوامل ← [MAKE-FACTOR(V, e) | عوامل]
-      اگر V متغیرِ پنهان است:
-          عوامل ← SUM-OUT(V, عوامل)
-  بازگرداندن NORMALIZE(POINTWISE-PRODUCT(عوامل))</code></pre>
+<pre class="code"><code>function ELIMINATION-ASK(X, e, bn) returns a distribution over X
+  inputs: X, the query variable
+          e, the observed event (an assignment of values to evidence variables)
+          bn, a Bayesian network with variables vars and CPTs
+  factors ← []
+  for each variable V in ORDER(vars):
+      factors ← [MAKE-FACTOR(V, e) | factors]
+      if V is a hidden variable:
+          factors ← SUM-OUT(V, factors)
+  return NORMALIZE(POINTWISE-PRODUCT(factors))</code></pre>
 <h3>۱۳.۳.۳ پیچیدگیِ استنتاجِ دقیق</h3>
 <p>پیچیدگیِ استنتاجِ دقیق در شبکه‌های بیز به‌شدت به ساختارِ شبکه بستگی دارد. شبکهٔ سرقتِ شکل ۱۳.۲ به خانواده‌ای از شبکه‌ها تعلق دارد که در آن‌ها حداکثر یک مسیرِ بدونِ جهت (یعنی با نادیده‌گرفتنِ جهتِ پیکان‌ها) بین هر دو گره وجود دارد. این‌ها «شبکه‌های تک‌متصل» (Singly Connected Networks) یا «پلیدرخت» (Polytrees) نامیده می‌شوند و ویژگیِ خاصاً خوبی دارند:</p>
 <p><strong>پیچیدگیِ زمانی و فضاییِ استنتاجِ دقیق در پلیدرخت‌ها در اندازهٔ شبکه خطی است.</strong></p>
@@ -405,12 +405,12 @@ f5(A) = ⟨P(m|a), P(m|¬a)⟩ = ⟨0.70, 0.01⟩</code></pre>
 </ol>
 <p>در این مورد، <span class="en-inline">PRIOR-SAMPLE</span> رخدادِ [<span class="en-inline">true, false, true, true]</span> را برمی‌گرداند.</p>
 <figure class="fig"><img src="figures/ch13/fig-13-16.jpg" alt="شکل 13.16"><figcaption><strong>شکل ۱۳.۱۶ — الگوریتمِ نمونه‌برداری که رخدادهایی از شبکهٔ بیزی تولید می‌کند. هر متغیر بر اساسِ توزیعِ شرطی به‌شرطِ مقادیرِ ازپیش‌نمونه‌برداری‌شدهٔ والدهایش نمونه‌برداری می‌شود.</strong></figcaption></figure>
-<pre class="code"><code>تابع PRIOR-SAMPLE(bn) رخدادی نمونه‌برداری‌شده از پیشینِ مشخص‌شده توسط bn برمی‌گرداند
-  ورودی‌ها: bn، شبکهٔ بیزی که توزیعِ مشترکِ P(X1,...,Xn) را مشخص می‌کند
-  x ← رخدادی با n عنصر
-  برای هر متغیرِ Xi در X1,...,Xn:
-      x[i] ← نمونهٔ تصادفی از P(Xi | parents(Xi))
-  بازگرداندن x</code></pre>
+<pre class="code"><code>function PRIOR-SAMPLE(bn) returns a sampled event from the prior specified by bn
+  inputs: bn، a Bayesian network specifying the joint distribution P(X1,...,Xn)
+  x ← an event with n elements
+  for each variable Xi in X1,...,Xn:
+      x[i] ← a random sample from P(Xi | parents(Xi))
+  return x</code></pre>
 <p>به‌آسانی دیده می‌شود <span class="en-inline">PRIOR-SAMPLE</span> نمونه‌ها را از توزیعِ مشترکِ پیشینیِ مشخص‌شده توسط شبکه تولید می‌کند. نخست، فرض کنیم <span class="en-inline">SPS(x1,...,xn)</span> احتمالِ تولیدِ رخدادِ خاصِ <span class="en-inline">x1,...,xn</span> توسط الگوریتمِ <span class="en-inline">PRIOR-SAMPLE</span> باشد. فقط با نگاه‌کردن به فرایندِ نمونه‌برداری:</p>
 <pre class="code"><code>SPS(x1,...,xn) = ∏ P(xi | parents(Xi))
                  i=1..n</code></pre>
@@ -426,16 +426,16 @@ f5(A) = ⟨P(m|a), P(m|¬a)⟩ = ⟨0.70, 0.01⟩</code></pre>
 <pre class="code"><code>P̂(X|e) = α NPS(X, e) = NPS(X, e) / NPS(e)</code></pre>
 <p>از معادلهٔ (13.7)، این می‌شود P̂(X|e) ≈ <span class="en-inline">P(X,e)/P(e) = P(X|e).</span> یعنی نمونه‌برداریِ ردّی به پاسخِ درست همگرا می‌شود.</p>
 <figure class="fig"><img src="figures/ch13/fig-13-17.jpg" alt="شکل 13.17"><figcaption><strong>شکل ۱۳.۱۷ — الگوریتمِ نمونه‌برداریِ ردّی برای پاسخ‌دادن به پرس‌وجوها با توجه به شواهد در شبکهٔ بیزی.</strong></figcaption></figure>
-<pre class="code"><code>تابع REJECTION-SAMPLING(X, e, bn, N) برآوردی از P(X|e) برمی‌گرداند
-  ورودی‌ها: X، متغیرِ پرس‌وجو
-            e، مقادیرِ مشاهده‌شده برای متغیرهای E
-            bn، شبکهٔ بیزی
-            N، شمارِ کلِ نمونه‌هایی که باید تولید شوند
-  متغیرهای محلی: C، بردارِ شمارش برای هر مقدارِ X، در آغاز صفر
-  برای j از 1 تا N:
+<pre class="code"><code>function REJECTION-SAMPLING(X, e, bn, N) returns an estimate of P(X|e)
+  inputs: X, the query variable
+          e, observed values for the variables E
+          bn, a Bayesian network
+          N, the total number of samples to generate
+  local variables: C, a count vector for each value of X, initially zero
+  for j = 1 to N:
       x ← PRIOR-SAMPLE(bn)
-      اگر x با e سازگار است پس C[j] ← C[j] + 1     که در آن xj مقدارِ X در x است
-  بازگرداندن NORMALIZE(C)</code></pre>
+      if x is consistent with e then C[j] ← C[j] + 1     where xj is the value of X in x
+  return NORMALIZE(C)</code></pre>
 <p>حالا که می‌دانیم نمونه‌برداریِ ردّی به پاسخِ درست همگرا می‌شود، پرسشِ بعدی این است که این همگرایی چقدر سریع رخ می‌دهد؟ دقیق‌تر، چند نمونه لازم است قبل از اینکه بدانیم برآوردهای حاصل با احتمالِ زیاد به پاسخ‌های درست نزدیک‌اند؟</p>
 <p>در حالی که پیچیدگیِ الگوریتم‌های دقیق تا حدِ زیادی به توپولوژیِ شبکه بستگی دارد—درخت‌ها آسان‌اند، شبکه‌های پرپیوند سخت‌اند—پیچیدگیِ نمونه‌برداریِ ردّی عمدتاً به کسری از نمونه‌هایی بستگی دارد که پذیرفته می‌شوند. این کسر دقیقاً برابرِ احتمالِ پیشینیِ شاهد، <span class="en-inline">P(e)</span> است. متأسفانه، برای مسائلِ پیچیده با متغیرهای شاهدِ بسیار، این کسر به‌طرزِ محوکننده‌ای کوچک است. وقتی روی نسخهٔ گسستهٔ شبکهٔ بیمهٔ خودرو در شکل ۱۳.۹ اعمال شود، کسرِ نمونه‌های سازگار با حالتِ شاهدِ نمونه‌ایِ نمونه‌برداری‌شده از خودِ شبکه معمولاً بین یک‌درهزار و یک‌در۱۰٬۰۰۰ است. همگرایی بسیار کند است (شکل ۱۳.۱۹ زیر را ببینید).</p>
 <p>انتظار داریم کسرِ نمونه‌های سازگار با شاهدِ e با رشدِ شمارِ متغیرهای شاهد به‌صورتِ نمایی کاهش یابد، پس رویه برای مسائلِ پیچیده غیرقابلِ‌استفاده است. همچنین با متغیرهای شاهدِ پیوسته‌مقدار دشواری دارد، زیرا احتمالِ تولیدِ نمونه‌ای سازگار با چنین شاهدی صفر است (اگر واقعاً پیوسته‌مقدار باشد) یا بی‌نهایت‌کوچک (اگر فقط عددِ ممیزِ شناورِ با دقتِ متناهی باشد).</p>
@@ -458,24 +458,24 @@ f5(A) = ⟨P(m|a), P(m|¬a)⟩ = ⟨0.70, 0.01⟩</code></pre>
      = α ∏i P(ei | parents(Ei))        (13.9)</code></pre>
 <p>بدین‌ترتیب وزن، حاصل‌ضربِ احتمال‌های شرطیِ متغیرهای شاهد به‌شرطِ والدهایشان است. (احتمال‌های شاهد عموماً «درستنمایی» (Likelihood) نامیده می‌شوند، از این رو نام.) محاسبهٔ وزن در <span class="en-inline">WEIGHTED-SAMPLE</span> به‌صورتِ افزایشی پیاده‌سازی می‌شود، و هر بار با متغیرِ شاهدِ مواجه‌شده در احتمالِ شرطی ضرب می‌شود. نرمال‌سازی در پایان، قبل از بازگرداندنِ نتیجهٔ پرس‌وجو، انجام می‌شود.</p>
 <figure class="fig"><img src="figures/ch13/fig-13-18.jpg" alt="شکل 13.18"><figcaption><strong>شکل ۱۳.۱۸ — الگوریتمِ وزن‌گذاریِ درستنمایی برای استنتاج در شبکه‌های بیزی. در WEIGHTED-SAMPLE، هر متغیرِ غیرشاهد بر اساسِ توزیعِ شرطی به‌شرطِ مقادیرِ ازپیش‌نمونه‌برداری‌شدهٔ والدهایش نمونه‌برداری می‌شود، در حالی که وزنی بر اساسِ درستنماییِ هر متغیرِ شاهد انباشته می‌شود.</strong></figcaption></figure>
-<pre class="code"><code>تابع LIKELIHOOD-WEIGHTING(X, e, bn, N) برآوردی از P(X|e) برمی‌گرداند
-  ورودی‌ها: X، متغیرِ پرس‌وجو
-            e، مقادیرِ مشاهده‌شده برای متغیرهای E
-            bn، شبکهٔ بیزی که توزیعِ مشترکِ P(X1,...,Xn) را مشخص می‌کند
-            N، شمارِ کلِ نمونه‌هایی که باید تولید شوند
-  متغیرهای محلی: W، بردارِ شمارشِ وزندار برای هر مقدارِ X، در آغاز صفر
-  برای j از 1 تا N:
+<pre class="code"><code>function LIKELIHOOD-WEIGHTING(X, e, bn, N) returns an estimate of P(X|e)
+  inputs: X, the query variable
+          e, observed values for the variables E
+          bn, a Bayesian network specifying the joint distribution P(X1,...,Xn)
+          N, the total number of samples to generate
+  local variables: W, a weighted count vector for each value of X, initially zero
+  for j = 1 to N:
       x, w ← WEIGHTED-SAMPLE(bn, e)
-      W[j] ← W[j] + w     که در آن xj مقدارِ X در x است
-  بازگرداندن NORMALIZE(W)
+      W[j] ← W[j] + w     where xj is the value of X in x
+  return NORMALIZE(W)
 
-تابع WEIGHTED-SAMPLE(bn, e) رخدادی و وزنی برمی‌گرداند
-  w ← 1؛ x ← رخدادی با n عنصر، با مقادیرِ ثابت‌شده از e
-  برای i از 1 تا n:
-      اگر Xi متغیرِ شاهد با مقدارِ xij در e است
-          پس w ← w × P(Xi = xij | parents(Xi))
-          وگرنه x[i] ← نمونهٔ تصادفی از P(Xi | parents(Xi))
-  بازگرداندن x, w</code></pre>
+function WEIGHTED-SAMPLE(bn, e) returns an event and a weight
+  w ← 1; x ← an event with n elements, with values fixed by e
+  for i = 1 to n:
+      if Xi is an evidence variable with value xij in e
+          then w ← w × P(Xi = xij | parents(Xi))
+          else x[i] ← a random sample from P(Xi | parents(Xi))
+  return x, w</code></pre>
 <p>الگوریتم را روی شبکهٔ نشان‌داده‌شده در شکل ۱۳.۱۵(الف) اعمال کنیم، با پرس‌وجوی <span class="en-inline">P(Rain | Cloudy=true, WetGrass=true)</span> و ترتیبِ <span class="en-inline">Cloudy, Sprinkler, Rain, WetGrass.</span> (هر ترتیبِ توپولوژیکی کار می‌کند.) فرایند به‌صورتِ زیر است: نخست، وزنِ w برابر 1.0 گذاشته می‌شود. سپس رخدادی تولید می‌شود:</p>
 <ol>
 <li><span class="en-inline">Cloudy</span> متغیرِ شاهد با مقدارِ <span class="en-inline">true</span> است. بنابراین، w ← <span class="en-inline">w × P(Cloudy=true) = 0.5</span> می‌گذاریم.</li>
@@ -497,16 +497,16 @@ f5(A) = ⟨P(m|a), P(m|¬a)⟩ = ⟨0.70, 0.01⟩</code></pre>
 <li><span class="en-inline">Cloudy</span> انتخاب و سپس، با توجه به مقادیرِ کنونیِ پوششِ مارکوفش، نمونه‌برداری می‌شود: در این مورد، از <span class="en-inline">P(Cloudy | Sprinkler=true, Rain=false)</span> نمونه‌برداری می‌کنیم. فرض کنیم نتیجه <span class="en-inline">Cloudy=false</span> باشد. سپس حالتِ کنونیِ تازه [<span class="en-inline">false, true, false, true]</span> است.</li>
 </ol>
 <figure class="fig"><img src="figures/ch13/fig-13-20.jpg" alt="شکل 13.20"><figcaption><strong>شکل ۱۳.۲۰ — الگوریتمِ نمونه‌برداریِ گیبس برای استنتاجِ تقریبی در شبکه‌های بیز.</strong></figcaption></figure>
-<pre class="code"><code>تابع GIBBS-ASK(X, e, bn, N) برآوردی از P(X|e) برمی‌گرداند
-  متغیرهای محلی: C، بردارِ شمارش برای هر مقدارِ X، در آغاز صفر
-                 Z، متغیرهای غیرشاهد در bn
-                 x، حالتِ کنونیِ شبکه، مقداردهی‌شده از e
-  مقداردهیِ اولیهٔ x با مقادیرِ تصادفی برای متغیرهای در Z
-  برای k از 1 تا N:
-      هر متغیرِ Zi از Z را طبقِ هر توزیعِ ρ(i) انتخاب کن
-      مقدارِ Zi در x را با نمونه‌برداری از P(Zi | mb(Zi)) بگذار
-      C[j] ← C[j] + 1     که در آن xj مقدارِ X در x است
-  بازگرداندن NORMALIZE(C)</code></pre>
+<pre class="code"><code>function GIBBS-ASK(X, e, bn, N) returns an estimate of P(X|e)
+  local variables: C, a count vector for each value of X, initially zero
+                 Z, the non-evidence variables in bn
+                 x, the current state of the network, initialized from e
+  initialize x with random values for the variables in Z
+  for k = 1 to N:
+      select each variable Zi in Z according to distribution ρ(i)
+      set the value of Zi in x by sampling from P(Zi | mb(Zi))
+      C[j] ← C[j] + 1     where xj is the value of X in x
+  return NORMALIZE(C)</code></pre>
 <p>خوشبختانه، محاسبهٔ توزیعِ پوششِ مارکوفِ <span class="en-inline">P(Xi | mb(Xi))</span>، که در آن <span class="en-inline">mb(Xi)</span> مقادیرِ متغیرهای در پوششِ مارکوفِ <span class="en-inline">Xi</span> یعنی <span class="en-inline">MB(Xi)</span> را نشان می‌دهد، هیچ استنتاجِ پیچیده‌ای در بر ندارد. چنان‌که در تمرین ۱۳.<span class="en-inline">MARB</span> نشان داده شده، توزیع به‌صورتِ زیر است:</p>
 <pre class="code"><code>P(xi | mb(Xi)) = α P(xi | parents(Xi)) × ∏ P(yj | parents(Yj))        (13.10)
                                           Yj ∈ Children(Xi)</code></pre>

@@ -266,9 +266,9 @@
 <figure class="fig"><img src="figures/ch02/fig-2-7.jpg" alt="شکل 2.7"><figcaption><strong>شکل ۲.۷ — برنامهٔ «عامل جدول‌محور» (TABLE-DRIVEN-AGENT) برای هر ادراک حسی تازه فراخوانی می‌شود و هر بار کنشی بازمی‌گرداند. کل توالی ادراک حسی را در حافظه نگه می‌دارد.</strong></figcaption></figure>
 <pre class="code"><code>function TABLE-DRIVEN-AGENT(percept) returns an action
   persistent:
-    percepts, یک توالی، در آغاز خالی
-    table, جدولی از کنش‌ها، فهرست‌بندی‌شده با توالی‌های ادراک حسی، در آغاز کاملاً مشخص
-  percept را به انتهای percepts اضافه کن
+    percepts, a sequence, initially empty
+    table, a table of actions, indexed by percept sequences, initially fully specified
+  add percept to the end of percepts
   action ← LOOKUP(percepts, table)
   return action</code></pre>
 <p>این جدول — که نمونه‌ای از آن برای جهان جاروبرقی در شکل ۲.۳ داده شده — تابع عاملی را که برنامهٔ عامل تجسم می‌بخشد به‌صراحت بازنمایی می‌کند. برای ساختن عامل عقلایی بدین روش، ما به‌عنوان طراح باید جدولی بسازیم که کنش مناسب را برای هر توالی ادراک حسی ممکن در بر داشته باشد. آموزنده است در نظر بگیریم چرا رویکرد جدول‌محور به ساخت عامل محکوم به شکست است. فرض کنیم P مجموعهٔ ادراک‌های حسی ممکن و T عمر عامل (مجموع ادراک‌هایی که دریافت خواهد کرد) باشد. جدول جست‌وجو Σ|P|ᵗ برای t از ۱ تا T مدخل خواهد داشت. تاکسی خودکار را در نظر بگیرید: ورودی بصری از یک دوربین (۸ دوربین معمول است) با نرخ تقریباً ۷۰ مگابایت در ثانیه وارد می‌شود (۳۰ فریم در ثانیه، ۱۰۸۰×۷۲۰ پیکسل با ۲۴ بیت اطلاعات رنگ). این جدول جست‌وجویی با بیش از ۱۰^۶۰۰٬۰۰۰٬۰۰۰٬۰۰۰ مدخل برای یک ساعت رانندگی می‌دهد. حتی جدول جست‌وجوی شطرنج — قطعهٔ کوچک و خوش‌رفتار جهان واقعی — دست‌کم ۱۰¹<sup>⁵⁰</sup> مدخل دارد. در مقایسه، شمار اتم‌های جهان قابل مشاهده کمتر از ۱۰⁸<sup>⁰</sup> است. اندازهٔ هراس‌آور این جدول‌ها بدان معناست که (الف) هیچ عامل فیزیکی در این جهان فضای ذخیرهٔ جدول را ندارد؛ (ب) طراح زمان ساخت جدول را نخواهد داشت؛ و (ج) هیچ عاملی هرگز نمی‌تواند همهٔ مدخل‌های درست جدول را از تجربه بیاموزد. با وجود همهٔ این‌ها، <span class="en-inline">TABLE-DRIVEN-AGENT</span> همان چیزی را که می‌خواهیم انجام می‌دهد، به شرط آنکه جدول درست پر شده باشد: تابع عامل مطلوب را پیاده‌سازی می‌کند.</p>
@@ -298,7 +298,7 @@
 <p>برنامهٔ عاملِ شکل ۲.۹ در شکل ۲.۱۰ آمده است.</p>
 <figure class="fig"><img src="figures/ch02/fig-2-10.jpg" alt="شکل 2.10"><figcaption><strong>شکل ۲.۱۰ — عامل بازتابی ساده.</strong> بر اساس قاعده‌ای عمل می‌کند که شرطش با حالت کنونیِ تعریف‌شده توسط ادراک حسی همخوانی دارد.</figcaption></figure>
 <pre class="code"><code>function SIMPLE-REFLEX-AGENT(percept) returns an action
-  persistent: rules, مجموعه‌ای از قواعد شرط–کنش
+  persistent: rules, a set of condition-action rules
   state ← INTERPRET-INPUT(percept)
   rule ← RULE-MATCH(state, rules)
   action ← rule.ACTION
@@ -319,11 +319,11 @@
 <figure class="fig"><img src="figures/ch02/fig-2-12.jpg" alt="شکل 2.12"><figcaption><strong>شکل ۲.۱۲ — عامل بازتابی مبتنی بر مدل.</strong> حالت کنونی جهان را با استفاده از مدل درونی پیگیری می‌کند و سپس کنش را همان‌گونه که عامل بازتابی انتخاب می‌کند.</figcaption></figure>
 <pre class="code"><code>function MODEL-BASED-REFLEX-AGENT(percept) returns an action
   persistent:
-    state, برداشت کنونی عامل از حالت جهان
-    transition model, توصیفی از اینکه حالت بعدی به حالت کنونی و کنش چگونه بستگی دارد
-    sensor model, توصیفی از اینکه حالت کنونی جهان در ادراک‌های حسی عامل چگونه بازتاب می‌شود
-    rules, مجموعه‌ای از قواعد شرط–کنش
-    action, تازه‌ترین کنش، در آغاز هیچ
+    state, the agent's current percept of the state of the world
+    transition model, a description of how the next state depends on the current state and action
+    sensor model, a description of how the current state of the world is reflected in the agent's percepts
+    rules, a set of condition-action rules
+    action, the most recent action, initially none
   state ← UPDATE-STATE(state, action, percept, transition model, sensor model)
   rule ← RULE-MATCH(state, rules)
   action ← rule.ACTION

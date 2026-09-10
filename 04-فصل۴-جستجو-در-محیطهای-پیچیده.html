@@ -157,7 +157,7 @@
 <pre class="code"><code>function HILL-CLIMBING(problem) returns a state that is a local maximum
   current ← problem.INITIAL
   while true do
-    neighbor ← بالاترین‌مقدار حالت جانشین current
+    neighbor ← highest-valued successor state of current
     if VALUE(neighbor) ≤ VALUE(current) then return current
     current ← neighbor</code></pre>
 <p>برای نشان دادن تپه‌نوردی، از مسئلهٔ هشت‌وزیر (8-Queens) استفاده می‌کنیم (شکل ۴.۳). از صورت‌بندی حالت-کامل (Complete-State Formulation) استفاده می‌کنیم؛ یعنی هر حالت همهٔ مؤلفه‌های راه‌حل را دارد، اما ممکن است همه در جای درست نباشند. در این مورد هر حالت ۸ وزیر روی تخته دارد، در هر ستون یکی. حالت آغازین تصادفی برگزیده می‌شود و جانشین‌های یک حالت، همهٔ حالت‌های ممکنِ تولیدشده با جابه‌جایی یک وزیر به خانه‌ای دیگر در همان ستون‌اند (پس هر حالت ۸×۷=۵۶ جانشین دارد). تابع هزینهٔ اکتشافی h شمار جفت‌وزیرهایی است که به هم حمله می‌کنند؛ این فقط برای راه‌حل‌ها صفر است. (اگر دو مهره در یک خط باشند، حتی اگر مهره‌ای میانشان باشد، حمله شمرده می‌شود.) شکل ۴.۳(ب) حالتی با <span class="en-inline">h=17</span> نشان می‌دهد. شکل همچنین مقادیر h همهٔ جانشین‌هایش را نشان می‌دهد.</p>
@@ -186,10 +186,10 @@
   for t = 1 to ∞ do
     T ← schedule(t)
     if T = 0 then return current
-    next ← یک جانشین تصادفی‌برگزیده از current
+    next ← a randomly selected successor of current
     ΔE ← VALUE(current) – VALUE(next)
     if ΔE &gt; 0 then current ← next
-    else current ← next فقط با احتمال e^(−ΔE/T)</code></pre>
+    else current ← next only with probability e^(−ΔE/T)</code></pre>
 <p>بازپخت شبیه‌سازی‌شده از دههٔ ۱۹۸۰ برای حل مسائل چیدمان <span class="en-inline">VLSI</span> به کار رفت. به‌طور گسترده در زمان‌بندی کارخانه و دیگر تکلیف‌های بهینه‌سازی بزرگ‌مقیاس اعمال شده است.</p>
 <h3>4.1.3 جستجوی پرتوی محلی</h3>
 <p>نگه‌داشتن فقط یک گره در حافظه شاید واکنشی افراطی به مسئلهٔ محدودیت‌های حافظه بنماید. الگوریتم جستجوی پرتوی محلی (Local Beam Search) به‌جای فقط یک حالت، k حالت را پیگیری می‌کند. با k حالتِ تصادفی‌تولیدشده آغاز می‌کند. در هر گام، همهٔ جانشین‌های هر k حالت تولید می‌شوند. اگر هر یک هدف باشد، الگوریتم می‌ایستد. وگرنه، k جانشینِ برتر را از فهرست کامل برمی‌گزیند و تکرار می‌کند.</p>
@@ -215,20 +215,15 @@
 <pre class="code"><code>function GENETIC-ALGORITHM(population, fitness) returns an individual
   repeat
     weights ← WEIGHTED-BY(population, fitness)
-    population2 ← فهرست خالی
+    population2 ← an empty list
     for i = 1 to SIZE(population) do
       parent1, parent2 ← WEIGHTED-RANDOM-CHOICES(population, weights, 2)
       child ← REPRODUCE(parent1, parent2)
-      if (احتمال تصادفی کوچک) then child ← MUTATE(child)
+      if (a small random probability) then child ← MUTATE(child)
       add child to population2
     population ← population2
-  until فردی به اندازهٔ کافی برازنده است، یا زمان کافی گذشته است
-  return بهترین فرد در population، بر اساس تابع fitness
-
-function REPRODUCE(parent1, parent2) returns an individual
-  n ← LENGTH(parent1)
-  c ← عدد تصادفی از 1 تا n
-  return APPEND(SUBSTRING(parent1, 1, c), SUBSTRING(parent2, c+1, n))</code></pre>
+  until an individual is sufficiently fit, or enough time has passed
+  return the best individual in population, according to fitness</code></pre>
 <p>الگوریتم‌های ژنتیک شبیه جستجوی پرتوی تصادفی‌اند، اما با افزوده‌شدن عملیات تلاقی. این اگر بلوک‌هایی باشند که کارکردهای مفید انجام می‌دهند سودمند است. برای نمونه، ممکن است گذاشتن سه وزیر اول در موقعیت‌های ۲، ۴ و ۶ (جایی که به هم حمله نمی‌کنند) بلوک مفیدی بسازد که بتوان با دیگر بلوک‌های مفیدِ حاضر در افراد دیگر ترکیبش کرد تا راه‌حل ساخته شود. به‌شکل ریاضی می‌توان نشان داد اگر بلوک‌ها هدفی نداشته باشند — برای نمونه اگر موقعیت‌های کد ژنتیک تصادفی درهم‌آمیخته شده باشند — تلاقی هیچ برتری‌ای منتقل نمی‌کند.</p>
 <p>نظریهٔ الگوریتم‌های ژنتیک با ایدهٔ «شِما» (Schema) توضیح می‌دهد این چگونه کار می‌کند؛ شِما زیررشته‌ای است که در آن برخی موقعیت‌ها را می‌توان نامشخص گذاشت. برای نمونه، شِما 246<strong></strong>* همهٔ حالت‌های هشت‌وزیری را توصیف می‌کند که سه وزیر اول در موقعیت‌های ۲، ۴ و ۶ هستند. رشته‌هایی که با شِما همخوان‌اند (مانند 24613578) «مصداق»های (Instances) شِما نامیده می‌شوند. می‌توان نشان داد اگر میانگین برازش مصداق‌های شِما بالاتر از میانگین باشد، شمار مصداق‌های شِما در طول زمان رشد خواهد کرد. بدیهی است این اثر اگر بیت‌های مجاور کاملاً بی‌ارتباط با هم باشند بعید است چشمگیر باشد، زیرا بلوک‌های پیوستهٔ کمی خواهند بود که منفعت سازگاری می‌دهند. الگوریتم‌های ژنتیک وقتی بهترین عملکرد را دارند که شِماها با مؤلفه‌های معنادار راه‌حل متناظر باشند. برای نمونه، اگر رشته بازنمایی آنتن باشد، شِماها ممکن است مؤلفه‌های آنتن مانند بازتابنده‌ها و منحرف‌کننده‌ها را بازنمایی کنند. مؤلفهٔ خوب به احتمال زیاد در گستره‌ای از طراحی‌های گوناگون خوب است. این پیشنهاد می‌کند استفادهٔ موفق از الگوریتم‌های ژنتیک مستلزم مهندسی دقیق بازنمایی است.</p>
 <p>در عمل، الگوریتم‌های ژنتیک جای خود را در چشم‌انداز گستردهٔ روش‌های بهینه‌سازی دارند (مارلر و آرورا، ۲۰۰۴)، به‌ویژه برای مسائل ساختاریافتهٔ پیچیده مانند چیدمان مدار یا زمان‌بندی کارگاه، و اخیراً برای تکامل معماری شبکه‌های عصبی عمیق (میکولاینن و همکاران، ۲۰۱۹). روشن نیست چقدر از جذابیت الگوریتم‌های ژنتیک از برتری‌شان در تکلیف‌های خاص ناشی می‌شود و چقدر از استعارهٔ جذاب تکامل.</p>
@@ -281,7 +276,7 @@ function REPRODUCE(parent1, parent2) returns an individual
   return OR-SEARCH(problem, problem.INITIAL, [])
 
 function OR-SEARCH(problem, state, path) returns a conditional plan, or failure
-  if problem.IS-GOAL(state) then return برنامهٔ خالی
+  if problem.IS-GOAL(state) then return empty plan
   if IS-CYCLE(path) then return failure
   for each action in problem.ACTIONS(state) do
     plan ← AND-SEARCH(problem, RESULTS(state, action), [state] + path)
@@ -392,18 +387,18 @@ function AND-SEARCH(problem, states, path) returns a conditional plan, or failur
 <figure class="fig"><img src="figures/ch04/fig-4-21.jpg" alt="شکل 4.21"><figcaption><strong>شکل ۴.۲۱ — عامل جستجوی آنلاین که از کاوش عمق-اول استفاده می‌کند.</strong> عامل فقط در فضاهای حالتی می‌تواند به‌شکل ایمن کاوش کند که هر کنش با کنش دیگری «خنثی» شود.</figcaption></figure>
 <pre class="code"><code>function ONLINE-DFS-AGENT(problem, s′) returns an action
   persistent:
-    s, a, حالت و کنش قبلی، در آغاز null
-    result, جدولی که (s, a) را به s′ نگاشت می‌کند، در آغاز خالی
-    untried, جدولی که s را به فهرستی از کنش‌های امتحان‌نشده نگاشت می‌کند
-    unbacktracked, جدولی که s را به فهرستی از حالت‌های هرگز-بازنگشته نگاشت می‌کند
+    s, a, the previous state and action, initially null
+    result, a table mapping (s, a) to s′, initially empty
+    untried, a table mapping s to a list of untried actions
+    unbacktracked, a table mapping s to a list of states never backtracked to
   if problem.IS-GOAL(s′) then return stop
-  if s′ حالت تازه‌ای است (در untried نیست) then untried[s′] ← problem.ACTIONS(s′)
-  if s null نیست then
+  if s′ is a new state (not in untried) then untried[s′] ← problem.ACTIONS(s′)
+  if s is not null then
     result[s, a] ← s′
-    add s به جلوی unbacktracked[s′]
-  if untried[s′] خالی است then
-    if unbacktracked[s′] خالی است then return stop
-    else a ← کنش b چنان‌که result[s′, b] = POP(unbacktracked[s′])
+    add s to the front of unbacktracked[s′]
+  if untried[s′] is empty then
+    if unbacktracked[s′] is empty then return stop
+    else a ← an action b such that result[s′, b] = POP(unbacktracked[s′])
   else a ← POP(untried[s′])
   s ← s′
   return a</code></pre>
@@ -419,21 +414,17 @@ function AND-SEARCH(problem, states, path) returns a conditional plan, or failur
 <figure class="fig"><img src="figures/ch04/fig-4-24.jpg" alt="شکل 4.24"><figcaption><strong>شکل ۴.۲۴ — عامل LRTA∗ کنش را بر اساس مقادیر حالت‌های همسایه برمی‌گزیند که با حرکت عامل در فضای حالت به‌روز می‌شوند.</strong></figcaption></figure>
 <pre class="code"><code>function LRTA*-AGENT(problem, s′, h) returns an action
   persistent:
-    s, a, حالت و کنش قبلی، در آغاز null
-    result, جدولی که (s, a) را به s′ نگاشت می‌کند، در آغاز خالی
-    H, جدولی که s را به تخمین هزینه نگاشت می‌کند، در آغاز خالی
+    s, a, the previous state and action, initially null
+    result, a table mapping (s, a) to s′, initially empty
+    H, a table mapping s to a cost estimate, initially empty
   if IS-GOAL(s′) then return stop
-  if s′ حالت تازه‌ای است (در H نیست) then H[s′] ← h(s′)
-  if s null نیست then
+  if s′ is a new state (not in H) then H[s′] ← h(s′)
+  if s is not null then
     result[s, a] ← s′
     H[s] ← min_{b∈ACTIONS(s)} LRTA*-COST(s, b, result[s, b], H)
   a ← argmin_{b∈ACTIONS(s′)} LRTA*-COST(problem, s′, b, result[s′, b], H)
   s ← s′
-  return a
-
-function LRTA*-COST(problem, s, a, s′, H) returns a cost estimate
-  if s′ تعریف‌نشده است then return h(s)
-  else return problem.ACTION-COST(s, a, s′) + H[s′]</code></pre>
+  return a</code></pre>
 <p>عامل <span class="en-inline">LRTA</span>∗ تضمین‌شده در هر محیط متناهیِ به‌شکل ایمن قابل کاوش هدفی می‌یابد. برخلاف A∗ اما برای فضاهای حالت بی‌نهایت کامل نیست — مواردی هست که می‌تواند بی‌نهایت به گمراهی کشیده شود. می‌تواند محیطی با n حالت را در بدترین حالت در O(n²) گام کاوش کند، اما اغلب بسیار بهتر عمل می‌کند. عامل <span class="en-inline">LRTA</span>∗ فقط یکی از خانوادهٔ بزرگ عامل‌های آنلاینی است که می‌توان با مشخص کردن قاعدهٔ انتخاب کنش و قاعدهٔ به‌روزرسانی به شیوه‌های گوناگون تعریف کرد. این خانواده را که در اصل برای محیط‌های تصادفی توسعه یافته، در فصل ۲۲ بحث می‌کنیم.</p>
 <h3>4.5.4 یادگیری در جستجوی آنلاین</h3>
 <p>نادانی آغازین عامل‌های جستجوی آنلاین فرصت‌های فراوانی برای یادگیری فراهم می‌کند. نخست، عامل‌ها «نقشهٔ» محیط را می‌آموزند — دقیق‌تر، پیامد هر کنش در هر حالت را — صرفاً با ثبت هر یک از تجربه‌هایشان. دوم، عامل‌های جستجوی محلی تخمین‌های دقیق‌تری از هزینهٔ هر حالت با استفاده از قواعد به‌روزرسانی محلی، مانند <span class="en-inline">LRTA</span>∗، به دست می‌آورند. در فصل ۲۲ نشان می‌دهیم این به‌روزرسانی‌ها سرانجام برای هر حالت به مقادیر دقیق همگرا می‌شوند، به شرط آنکه عامل فضای حالت را به‌شیوهٔ درست کاوش کند. وقتی مقادیر دقیق شناخته شدند، تصمیم‌های بهینه را می‌توان صرفاً با حرکت به کم‌هزینه‌ترین جانشین گرفت — یعنی تپه‌نوردی ناب آنگاه راهبردی بهینه است.</p>

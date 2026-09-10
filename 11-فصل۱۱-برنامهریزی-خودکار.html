@@ -330,16 +330,16 @@ Refinement(Navigate([a,b],[x,y]),
 <p>رویکرد به الگوریتم ساده‌ای می‌انجامد: به‌طور مکرر <span class="en-inline">HLA</span>یی را در برنامهٔ کنونی برگزین و آن را با یکی از پالایش‌هایش جایگزین کن، تا آنکه برنامه هدف را محقق کند. یکی از پیاده‌سازی‌های ممکن مبتنی بر جستجوی درختی سطح-اول در شکل 11.8 نشان داده شده. برنامه‌ها به ترتیب عمق تودرتویی پالایش‌ها در نظر گرفته می‌شوند، نه شمار گام‌های اولیه. طراحی نسخهٔ جستجوی گرافی الگوریتم و نیز نسخه‌های عمق-اول و تعمیق تکراری سرراست است.</p>
 <figure class="fig"><img src="figures/ch11/fig-11-8.jpg" alt="شکل 11.8"><figcaption><strong>شکل 11.8 — پیاده‌سازی سطح-اول جستجوی برنامه‌ریزی سلسله‌مراتبی پیشرو.</strong> برنامهٔ آغازین عرضه‌شده به الگوریتم [<span class="en-inline">Act]</span> است. تابع <span class="en-inline">REFINEMENTS</span> مجموعه‌ای از توالی‌های کنش بازمی‌گرداند، برای هر پالایش <span class="en-inline">HLA</span> که پیش‌شرط‌هایش توسط حالتِ مشخص‌شده، <span class="en-inline">outcome</span>، برآورده می‌شوند.</figcaption></figure>
 <pre class="code"><code>function HIERARCHICAL-SEARCH(problem, hierarchy) returns a solution or failure
-  frontier ← یک صف FIFO با [Act] به‌عنوان تنها عنصر
+  frontier ← a FIFO queue with [Act] as the only element
   while true do
     if IS-EMPTY(frontier) then return failure
-    plan ← POP(frontier)          // کم‌عمق‌ترین برنامه در frontier را برمی‌گزیند
-    hla ← نخستین HLA در plan، یا null اگر هیچ نباشد
-    prefix, suffix ← زیرتوالی‌های کنش پیش و پس از hla در plan
+    plan ← POP(frontier)          // selects the shallowest plan in frontier
+    hla ← the first HLA in plan, or null if none
+    prefix, suffix ← subsequences of actions before and after hla in plan
     outcome ← RESULT(problem.INITIAL, prefix)
-    if hla null است then         // پس plan اولیه است و outcome نتیجهٔ آن است
+    if hla is null then         // so plan is primitive and outcome is its result
       if problem.IS-GOAL(outcome) then return plan
-    else for each sequence در REFINEMENTS(hla, outcome, hierarchy) do
+    else for each sequence in REFINEMENTS(hla, outcome, hierarchy) do
       add APPEND(prefix, sequence, suffix) to frontier</code></pre>
 <p>در اصل، این شکل از جستجوی سلسله‌مراتبی فضای توالی‌هایی را کاوش می‌کند که با دانشِ موجود در کتابخانهٔ <span class="en-inline">HLA</span> دربارهٔ چگونگی انجام کارها سازگارند. دانش فراوانی را می‌توان رمزگذاری کرد، نه فقط در توالی‌های کنشِ مشخص‌شده در هر پالایش، بلکه در پیش‌شرط‌های پالایش‌ها. برای برخی حوزه‌ها، برنامه‌ریزهای <span class="en-inline">HTN</span> توانسته‌اند برنامه‌های عظیمی با جستجوی بسیار اندک تولید کنند. برای نمونه، <span class="en-inline">O-PLAN</span> (بل و تیت، ۱۹۸۵)، که برنامه‌ریزی <span class="en-inline">HTN</span> را با زمان‌بندی ترکیب می‌کند، برای توسعهٔ برنامه‌های تولیدی هیتاچی استفاده شده. مسئلهٔ نمونه شامل خط تولیدی با ۳۵۰ محصول متفاوت، ۳۵ ماشین مونتاژ و بیش از ۲۰۰۰ عملیات متفاوت است. برنامه‌ریز زمان‌بندی ۳۰روزه با سه شیفت ۸ساعته در روز تولید می‌کند، شامل ده‌ها میلیون گام. جنبهٔ مهم دیگر برنامه‌های <span class="en-inline">HTN</span> آن است که، طبق تعریف، ساختار سلسله‌مراتبی دارند؛ معمولاً این فهم آن‌ها را برای انسان‌ها آسان می‌کند.</p>
 <p>منافع محاسباتی جستجوی سلسله‌مراتبی را می‌توان با بررسی حالت ایده‌آل‌شده‌ای دید. فرض کنیم مسئلهٔ برنامه‌ریزی راه‌حلی با d کنش اولیه دارد. برای برنامه‌ریز فضای حالت پیشروی غیرسلسله‌مراتبی با b کنش مجاز در هر حالت، هزینه O(bᵈ) است، چنان‌که در فصل ۳ توضیح داده شد. برای برنامه‌ریز <span class="en-inline">HTN</span>، ساختار پالایشِ بسیار منظمی فرض کنیم: هر کنش غیراولیه r پالایش ممکن دارد، هر یک به k کنش در سطح پایین‌تر بعدی. می‌خواهیم بدانیم با این ساختار چند درخت پالایش متفاوت هست. حال، اگر d کنش در سطح اولیه باشد، شمار سطح‌های زیر ریشه <span class="en-inline">logk d</span> است، پس شمار گره‌های پالایش داخلی 1+<span class="en-inline">k+k</span>²+...+k^(logk d −1) = (d−1)/(k−1) است. هر گره داخلی r پالایش ممکن دارد، پس r^((d−1)/(k−1)) درخت تجزیهٔ ممکن می‌توان ساخت.</p>
@@ -370,28 +370,28 @@ Refinement(Navigate([a,b],[x,y]),
 <p>الگوریتم برنامه‌ریزی سلسله‌مراتبی با توصیف‌های فرشته‌ای تقریبی در شکل 11.11 نشان داده شده. برای سادگی، همان طرح کلی استفاده‌شده در شکل 11.8 را حفظ کرده‌ایم، یعنی جستجوی سطح-اول در فضای پالایش‌ها. چنان‌که تازه توضیح دادیم، الگوریتم می‌تواند برنامه‌هایی را که کار خواهند کرد و نمی‌کنند با بررسی اشتراک‌های مجموعه‌های دست‌یافتنی خوش‌بینانه و بدبینانه با هدف شناسایی کند. (جزئیات محاسبهٔ مجموعه‌های دست‌یافتنی برنامه با توصیف‌های تقریبی هر گام در تمرین 11.<span class="en-inline">HLAP</span> پوشش داده شده.)</p>
 <figure class="fig"><img src="figures/ch11/fig-11-11.jpg" alt="شکل 11.11"><figcaption><strong>شکل 11.11 — الگوریتم برنامه‌ریزی سلسله‌مراتبی که از معناشناسی فرشته‌ای برای شناسایی و تعهد به برنامه‌های سطح‌بالای کارکننده استفاده می‌کند، در حالی که از برنامه‌های سطح‌بالای غیرکارکننده اجتناب می‌کند.</strong> گزارهٔ <span class="en-inline">MAKING-PROGRESS</span> بررسی می‌کند مطمئن شویم در بازگشت بی‌نهایت پالایش‌ها گیر نکرده‌ایم. در سطح بالا، <span class="en-inline">ANGELIC-SEARCH</span> را با [<span class="en-inline">Act]</span> به‌عنوان <span class="en-inline">initialPlan</span> فراخوانی کن.</figcaption></figure>
 <pre class="code"><code>function ANGELIC-SEARCH(problem, hierarchy, initialPlan) returns solution or fail
-  frontier ← یک صف FIFO با initialPlan به‌عنوان تنها عنصر
+  frontier ← a FIFO queue with initialPlan as the only element
   while true do
     if EMPTY?(frontier) then return fail
-    plan ← POP(frontier)          // کم‌عمق‌ترین گره در frontier را برمی‌گزیند
-    if REACH+(problem.INITIAL, plan) با problem.GOAL اشتراک دارد then
-      if plan اولیه است then return plan
+    plan ← POP(frontier)          // selects the shallowest node in frontier
+    if REACH+(problem.INITIAL, plan) intersects problem.GOAL then
+      if plan is initial then return plan
       guaranteed ← REACH−(problem.INITIAL, plan) ∩ problem.GOAL
       if guaranteed ≠ {} and MAKING-PROGRESS(plan, initialPlan) then
-        finalState ← هر عنصری از guaranteed
+        finalState ← an element of guaranteed
         return DECOMPOSE(hierarchy, problem.INITIAL, plan, finalState)
-    hla ← برخی HLA در plan
-    prefix, suffix ← زیرتوالی‌های کنش پیش و پس از hla در plan
+    hla ← some HLA in plan
+    prefix, suffix ← subsequences of actions before and after hla in plan
     outcome ← RESULT(problem.INITIAL, prefix)
-    for each sequence در REFINEMENTS(hla, outcome, hierarchy) do
+    for each sequence in REFINEMENTS(hla, outcome, hierarchy) do
       frontier ← Insert(APPEND(prefix, sequence, suffix), frontier)
 
 function DECOMPOSE(hierarchy, s0, plan, sf) returns a solution
-  solution ← یک برنامهٔ خالی
-  while plan خالی نیست do
+  solution ← an empty plan
+  while plan is not empty do
     action ← REMOVE-LAST(plan)
-    si ← حالتی در REACH−(s0, plan) چنان‌که sf ∈ REACH−(si, action)
-    problem ← مسئله‌ای با INITIAL = si و GOAL = sf
+    si ← a state in REACH−(s0, plan) such that sf ∈ REACH−(si, action)
+    problem ← a problem with INITIAL = si and GOAL = sf
     solution ← APPEND(ANGELIC-SEARCH(problem, hierarchy, action), solution)
     sf ← si
   return solution</code></pre>
