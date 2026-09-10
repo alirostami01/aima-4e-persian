@@ -16,6 +16,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
           git clone --depth 1 https://github.com/aimacode/aima-pseudocode.git /tmp/aima-pseudocode
           pdftotext -layout /tmp/aima-pseudocode/algorithms.pdf /tmp/aima4e-algorithms.txt
           python3 <<'PY'
@@ -27,15 +29,12 @@ jobs:
           sources={}
           for m in function_re.finditer(pdf_text):
               name=m.group(1).upper(); body=m.group(0).rstrip()
-              body=re.sub(r'(?m)^\s*(?:CHAPTER|Chapter)\s+\d+\s*$','',body)
-              body=re.sub(r'(?m)^\s*\d+\s*$','',body)
-              body=re.sub(r'\n{3,}','\n\n',body).strip()
+              body=re.sub(r'(?m)^\s*(?:CHAPTER|Chapter)\s+\d+\s*$','',body); body=re.sub(r'(?m)^\s*\d+\s*$','',body); body=re.sub(r'\n{3,}','\n\n',body).strip()
               if not persian.search(body): sources[name]=body
           aliases={'MINIMAX-DECISION':'MINIMAX-SEARCH','MAX-VALUE':'MINIMAX-SEARCH','MIN-VALUE':'MINIMAX-SEARCH'}
           block_re=re.compile(r'(?s)(<pre\s+class=["\']code["\']\s*>\s*<code[^>]*>)(.*?)(</code>\s*</pre>)')
           def source_for(raw):
-              text=html.unescape(re.sub(r'<[^>]+>','',raw))
-              names=[n.upper() for n in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*_-]*)',text)]
+              text=html.unescape(re.sub(r'<[^>]+>','',raw)); names=[n.upper() for n in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*_-]*)',text)]
               for n in names:
                   key=aliases.get(n,n)
                   if key in sources: return sources[key]
@@ -56,16 +55,10 @@ jobs:
               for m in block_re.finditer(text):
                   code=html.unescape(re.sub(r'<[^>]+>','',m.group(2)))
                   if persian.search(code) and re.search(r'\b(?:function|procedure)\b',code): remaining.append((str(path),code.splitlines()[0].strip()))
-          print(f"HTML files scanned: {len(html_files)}")
-          print(f"Pseudocode blocks found: {stats['total']}")
-          print(f"Pseudocode blocks replaced from AIMA 4e PDF: {stats['replaced']}")
-          print(f"Unmatched pseudocode blocks: {stats['unmatched']}")
-          print(f"Files changed: {len(changed)}")
+          print(f"HTML files scanned: {len(html_files)}"); print(f"Pseudocode blocks found: {stats['total']}"); print(f"Pseudocode blocks replaced from AIMA 4e PDF: {stats['replaced']}"); print(f"Unmatched pseudocode blocks: {stats['unmatched']}"); print(f"Files changed: {len(changed)}")
           for x in changed: print('changed:',x)
-          if unmatched:
-              print('UNMATCHED:'); [print('-',p,':',x) for p,x in unmatched]
-          if remaining:
-              print('ERROR: Persian pseudocode remains:'); [print('-',p,':',x) for p,x in sorted(set(remaining))]; raise SystemExit(1)
+          if unmatched: print('UNMATCHED:'); [print('-',p,':',x) for p,x in unmatched]
+          if remaining: print('ERROR: Persian pseudocode remains:'); [print('-',p,':',x) for p,x in sorted(set(remaining))]; raise SystemExit(1)
           PY
       - name: Commit synchronized HTML files
         shell: bash
