@@ -1,0 +1,208 @@
+name: Sync English AIMA 4e pseudocode
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Sync pseudocode
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/aimacode/aima-pseudocode.git /tmp/aima-pseudocode
+          python3 <<'PY'
+          import html
+          import pathlib
+          import re
+          import subprocess
+
+          root = pathlib.Path('.')
+          source_root = pathlib.Path('/tmp/aima-pseudocode/md')
+
+          # The official AIMA pseudocode repository identifies the 4th-edition
+          # algorithms with an "AIMA4e" section. We use those sections only.
+          sources = {}
+          for path in source_root.glob('*.md'):
+              text = path.read_text(encoding='utf-8')
+              m = re.search(r'(?ms)^## AIMA4e\s*\n(.*?)(?=^---\s*$|^## |\Z)', text)
+              if not m:
+                  continue
+              body = m.group(1).strip()
+              if not body:
+                  continue
+              # A source file may contain more than one algorithm separated by
+              # horizontal rules. Keep all AIMA4e pseudocode sections together.
+              body = re.sub(r'(?m)^---\s*$', '', body).strip()
+              name = path.stem.lower().replace('_', '-').replace(' ', '-')
+              sources[name] = body
+
+          def clean_md_pseudocode(md: str) -> str:
+              # Remove the prose/figure section and markdown presentation while
+              # retaining the actual pseudocode text.
+              md = re.split(r'(?m)^__FIGURE\b', md, maxsplit=1)[0]
+              md = html.unescape(md)
+              md = re.sub(r'<a\b[^>]*>(.*?)</a>', r'\1', md, flags=re.S)
+              md = re.sub(r'<img\b[^>]*>', '', md, flags=re.S)
+              md = re.sub(r'<[^>]+>', '', md)
+              md = md.replace('&emsp;', '    ')
+              # Common AIMA pseudocode markdown constructs.
+              replacements = {
+                  r'__function__': 'function', r'__returns__': 'returns',
+                  r'__return__': 'return', r'__if__': 'if', r'__then__': 'then',
+                  r'__else__': 'else', r'__for each__': 'for each',
+                  r'__in__': 'in', r'__do__': 'do', r'__while__': 'while',
+                  r'__or__': 'or', r'__and__': 'and', r'__not__': 'not',
+                  r'__true__': 'true', r'__false__': 'false',
+              }
+              for old, new in replacements.items():
+                  md = re.sub(old, new, md)
+              md = re.sub(r'\\-', '-', md)
+              md = re.sub(r'\\([*_])', r'\1', md)
+              md = re.sub(r'(?<!\w)_([^_\n]+)_(?!\w)', r'\1', md)
+              md = re.sub(r'\*\*([^*]+)\*\*', r'\1', md)
+              md = re.sub(r'\s+\n', '\n', md)
+              lines = [ln.rstrip() for ln in md.splitlines()]
+              # Drop headings accidentally retained from markdown.
+              lines = [ln for ln in lines if not re.match(r'^#{1,6}\s', ln)]
+              while lines and not lines[0].strip():
+                  lines.pop(0)
+              while lines and not lines[-1].strip():
+                  lines.pop()
+              return '\n'.join(lines)
+
+          source_text = {k: clean_md_pseudocode(v) for k, v in sources.items()}
+
+          # Build an index from function/procedure names appearing in the official
+          # AIMA4e pseudocode. This lets us match translated surrounding prose while
+          # still preserving the original algorithm identifiers.
+          function_index = {}
+          for filename, body in source_text.items():
+              names = set(re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)', body))
+              for name in names:
+                  function_index.setdefault(name.upper(), set()).add(filename)
+
+          # A few 4e algorithms are represented as equations rather than a
+          # "function" declaration; map their canonical identifiers explicitly.
+          aliases = {
+              'MINIMAX-DECISION': 'minimax-decision',
+              'MAX-VALUE': 'minimax-decision',
+              'MIN-VALUE': 'minimax-decision',
+              'ALPHA-BETA-SEARCH': 'alpha-beta-search',
+              'MAX-VALUE-AB': 'alpha-beta-search',
+              'MIN-VALUE-AB': 'alpha-beta-search',
+              'MONTE-CARLO-TREE-SEARCH': 'monte-carlo-tree-search',
+          }
+
+          # Some source filenames have names that differ from the algorithm title.
+          filename_aliases = {
+              'minimax-search': 'minimax-decision',
+              'lrta*-agent': 'lrtaStar-Agent',
+          }
+
+          changed = []
+          unmatched = []
+          persian = re.compile(r'[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]')
+          block_re = re.compile(r'(?s)(<pre\s+class=["\']code["\']\s*>\s*<code[^>]*>)(.*?)(</code>\s*</pre>)')
+
+          def candidate_for_block(raw: str):
+              text = html.unescape(re.sub(r'<[^>]+>', '', raw))
+              text = text.replace('\\-', '-')
+              # Prefer function/procedure declarations.
+              names = re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)', text)
+              for n in names:
+                  n = n.upper()
+                  if n in aliases:
+                      return aliases[n]
+                  if n in function_index:
+                      vals = function_index[n]
+                      if len(vals) == 1:
+                          return next(iter(vals))
+              # Fall back to distinctive all-caps algorithm identifiers.
+              for n in re.findall(r'\b[A-Z][A-Z0-9?*-]{4,}\b', text):
+                  if n in aliases:
+                      return aliases[n]
+                  if n in function_index and len(function_index[n]) == 1:
+                      return next(iter(function_index[n]))
+              return None
+
+          html_files = sorted(root.glob('[0-9][0-9]-*.html'))
+          total_blocks = 0
+          replaced_blocks = 0
+
+          for path in html_files:
+              original = path.read_text(encoding='utf-8')
+
+              def replace(match):
+                  nonlocal total_blocks, replaced_blocks
+                  total_blocks += 1
+                  old = match.group(2)
+                  key = candidate_for_block(old)
+                  if not key:
+                      unmatched.append(f'{path}: {html.unescape(old)[:120].replace(chr(10), " ")}')
+                      return match.group(0)
+                  actual_key = key
+                  if actual_key not in source_text:
+                      actual_key = filename_aliases.get(actual_key, actual_key)
+                  if actual_key not in source_text:
+                      unmatched.append(f'{path}: {key}')
+                      return match.group(0)
+                  new = source_text[actual_key]
+                  if persian.search(new):
+                      raise SystemExit(f'Persian text found in source pseudocode: {actual_key}')
+                  replaced_blocks += 1
+                  return match.group(1) + html.escape(new, quote=False) + match.group(3)
+
+              updated = block_re.sub(replace, original)
+              if updated != original:
+                  path.write_text(updated, encoding='utf-8')
+                  changed.append(str(path))
+
+          print(f'HTML files scanned: {len(html_files)}')
+          print(f'Pseudocode blocks found: {total_blocks}')
+          print(f'Pseudocode blocks replaced: {replaced_blocks}')
+          print(f'Files changed: {len(changed)}')
+          for p in changed:
+              print(f'  changed: {p}')
+
+          if unmatched:
+              print('Unmatched pseudocode blocks/identifiers:')
+              for item in unmatched:
+                  print(f'  - {item}')
+              # Do not fail the job: some <pre> blocks are examples/formulas rather
+              # than book pseudocode. The validation below still guarantees that every
+              # replaced block is English.
+          
+          # Strong validation: no Persian characters may remain inside code blocks
+          # that were touched by this synchronization.
+          for path in html_files:
+              text = path.read_text(encoding='utf-8')
+              for m in block_re.finditer(text):
+                  code = html.unescape(re.sub(r'<[^>]+>', '', m.group(2)))
+                  if persian.search(code):
+                      raise SystemExit(f'Persian text remains in pseudocode/code block: {path}')
+          PY
+
+      - name: Commit synchronized HTML files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add '*.html'
+          if git diff --cached --quiet; then
+            echo "No HTML changes were necessary."
+            exit 0
+          fi
+          git commit -m "docs: use English AIMA 4e pseudocode in HTML"
+          git push
