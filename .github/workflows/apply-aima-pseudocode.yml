@@ -1,0 +1,56 @@
+name: Apply AIMA 4e English pseudocode
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor == 'alirostami01'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply pseudocode replacements
+        env:
+          REPLACEMENTS_B64: REPLACE_B64
+        run: |
+          python3 - <<'PY'
+          import os, re, json, base64, pathlib, subprocess
+          replacements = json.loads(base64.b64decode(os.environ["REPLACEMENTS_B64"]).decode("utf-8"))
+          root = pathlib.Path(".")
+          for key, replacement in replacements.items():
+              path_s, idx_s = key.rsplit("::", 1)
+              path = root / path_s
+              s = path.read_text(encoding="utf-8")
+              blocks = list(re.finditer(r'<pre class="code"><code>(.*?)</code></pre>', s, re.S))
+              idx = int(idx_s)
+              if idx >= len(blocks):
+                  raise SystemExit(f"Missing block {path_s} #{idx}")
+              m = blocks[idx]
+              s = s[:m.start(1)] + replacement + s[m.end(1):]
+              path.write_text(s, encoding="utf-8")
+          for path in root.glob("*.html"):
+              s = path.read_text(encoding="utf-8")
+              for idx, m in enumerate(re.finditer(r'<pre class="code"><code>(.*?)</code></pre>', s, re.S)):
+                  c = m.group(1)
+                  if re.search(r'\b(?:function|procedure)\b', c, re.I) and re.search(r'[آ-ی]', c):
+                      raise SystemExit(f"Persian remains in pseudocode: {path} #{idx}")
+          p = root / "08-فصل۸-منطق-مرتبه-اول.html"
+          if p.exists():
+              s = p.read_text(encoding="utf-8")
+              m = re.search(r'<pre class="code"><code>(.*?)</code></pre>', s, re.S)
+              if m and re.search(r'[آ-ی]', m.group(1)):
+                  raise SystemExit("Persian remains in chapter 8 grammar block")
+          wf = root / ".github/workflows/apply-aima-pseudocode.yml"
+          wf.unlink(missing_ok=True)
+          subprocess.run(["git", "config", "user.name", "Ali Rostami"], check=True)
+          subprocess.run(["git", "config", "user.email", "rostami.ali@gmail.com"], check=True)
+          subprocess.run(["git", "add", "*.html", ".github/workflows/apply-aima-pseudocode.yml"], check=True)
+          subprocess.run(["git", "commit", "-m", "docs: use English AIMA 4e pseudocode in chapter HTML"], check=True)
+          subprocess.run(["git", "push", "origin", "HEAD:main"], check=True)
+          PY
