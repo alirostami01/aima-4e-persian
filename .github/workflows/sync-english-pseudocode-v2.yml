@@ -15,32 +15,26 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq poppler-utils
-          git clone --depth 1 https://github.com/aimacode/aima-pseudocode.git /tmp/aima-pseudocode
-          pdftotext -layout /tmp/aima-pseudocode/algorithms.pdf /tmp/aima4e-algorithms.txt
+          curl -fsSL https://people.eecs.berkeley.edu/~russell/aima/algorithms.pdf -o /tmp/aima4e-algorithms.pdf
+          pdftotext -layout /tmp/aima4e-algorithms.pdf /tmp/aima4e-algorithms.txt
           python3 <<'PY'
           import html, pathlib, re
           root=pathlib.Path('.')
           pdf=pathlib.Path('/tmp/aima4e-algorithms.txt').read_text(encoding='utf-8',errors='replace').replace('\f','\n')
           persian=re.compile(r'[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]')
           block_re=re.compile(r'(?s)(<pre\s+class=["\']code["\']\s*>\s*<code[^>]*>)(.*?)(</code>\s*</pre>)')
-          aliases={'MINIMAX-DECISION':'MINIMAX-SEARCH','MAX-VALUE':'MINIMAX-SEARCH','MIN-VALUE':'MINIMAX-SEARCH'}
-          cache={}
+          aliases={'MINIMAX-DECISION':'MINIMAX-SEARCH','MAX-VALUE':'MINIMAX-SEARCH','MIN-VALUE':'MINIMAX-SEARCH'}; cache={}
           def get_source(name):
               name=aliases.get(name.upper(),name.upper())
               if name in cache: return cache[name]
               m=re.search(r'(?i)\b(?:function|procedure)\s+'+re.escape(name)+r'\b',pdf)
               if not m: cache[name]=None; return None
-              tail=pdf[m.end():]
-              fig=re.search(r'(?i)\bFigure\s+\d+\.\d+\b',tail)
+              tail=pdf[m.end():]; fig=re.search(r'(?i)\bFigure\s+\d+\.\d+\b',tail)
               body=pdf[m.start():m.end()+fig.start() if fig else len(pdf)].strip()
-              body=re.sub(r'(?m)^\s*(?:CHAPTER|Chapter)\s+\d+\s*$','',body)
-              body=re.sub(r'(?m)^\s*\d+\s*$','',body)
-              body=re.sub(r'\n{3,}','\n\n',body).strip()
-              cache[name]=None if persian.search(body) else body
-              return cache[name]
+              body=re.sub(r'(?m)^\s*(?:CHAPTER|Chapter)\s+\d+\s*$','',body); body=re.sub(r'(?m)^\s*\d+\s*$','',body); body=re.sub(r'\n{3,}','\n\n',body).strip()
+              cache[name]=None if persian.search(body) else body; return cache[name]
           def source_for(raw):
-              text=html.unescape(re.sub(r'<[^>]+>','',raw))
-              names=[n.upper() for n in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*_-]*)',text)]
+              text=html.unescape(re.sub(r'<[^>]+>','',raw)); names=[n.upper() for n in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*_-]*)',text)]
               if 'game.IS-CUTOFF' in text: names.append('ALPHA-BETA-SEARCH')
               if not names and 'MAX-VALUE' in text: names.append('MINIMAX-SEARCH')
               for n in names:
@@ -62,16 +56,9 @@ jobs:
               for m in block_re.finditer(text):
                   code=html.unescape(re.sub(r'<[^>]+>','',m.group(2)))
                   if persian.search(code) and re.search(r'\b(?:function|procedure)\b',code): remaining.append((str(path),code.splitlines()[0].strip()))
-          print(f"HTML files scanned: {len(html_files)}")
-          print(f"Pseudocode blocks found: {stats['total']}")
-          print(f"Pseudocode blocks replaced: {stats['replaced']}")
-          print(f"Unmatched blocks: {stats['unmatched']}")
-          print(f"Functions resolved from PDF: {sum(v is not None for v in cache.values())}/{len(cache)}")
-          print(f"Files changed: {len(changed)}")
+          print(f"HTML files scanned: {len(html_files)}"); print(f"Pseudocode blocks found: {stats['total']}"); print(f"Pseudocode blocks replaced: {stats['replaced']}"); print(f"Unmatched blocks: {stats['unmatched']}"); print(f"Functions resolved from PDF: {sum(v is not None for v in cache.values())}/{len(cache)}"); print(f"Files changed: {len(changed)}")
           if remaining:
-              print('ERROR: Persian pseudocode remains:')
-              for p,x in sorted(set(remaining)): print('-',p,':',x)
-              raise SystemExit(1)
+              print('ERROR: Persian pseudocode remains:'); [print('-',p,':',x) for p,x in sorted(set(remaining))]; raise SystemExit(1)
           PY
       - name: Commit synchronized HTML files
         shell: bash
