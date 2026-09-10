@@ -1,0 +1,141 @@
+name: One-time AIMA 4e pseudocode commit
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.event.head_commit.message != 'docs: replace HTML pseudocode with English AIMA 4e'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace pseudocode blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/aimacode/aima-pseudocode.git /tmp/aima-pseudocode
+          python3 <<'PY'
+          import html, pathlib, re
+
+          root = pathlib.Path('.')
+          source_root = pathlib.Path('/tmp/aima-pseudocode/md')
+          persian = re.compile(r'[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]')
+
+          def clean(md):
+              md = re.split(r'(?m)^__FIGURE\b', md, maxsplit=1)[0]
+              md = html.unescape(md)
+              md = re.sub(r'<[^>]+>', '', md)
+              replacements = {
+                  '__function__':'function','__procedure__':'procedure','__returns__':'returns',
+                  '__return__':'return','__if__':'if','__then__':'then','__else__':'else',
+                  '__for each__':'for each','__in__':'in','__do__':'do','__while__':'while',
+                  '__or__':'or','__and__':'and','__not__':'not','__true__':'true','__false__':'false',
+              }
+              for old, new in replacements.items():
+                  md = md.replace(old, new)
+              md = re.sub(r'\\-', '-', md)
+              md = re.sub(r'\\([*_])', r'\1', md)
+              md = re.sub(r'(?<!\w)_([^_\n]+)_(?!\w)', r'\1', md)
+              md = re.sub(r'\*\*([^*]+)\*\*', r'\1', md)
+              lines = [x.rstrip() for x in md.splitlines() if not re.match(r'^#{1,6}\s', x)]
+              while lines and not lines[0].strip(): lines.pop(0)
+              while lines and not lines[-1].strip(): lines.pop()
+              return '\n'.join(lines)
+
+          # Prefer the AIMA4e section for every algorithm. If the official markdown
+          # file has not yet been updated for 4e, use its AIMA3e section; the official
+          # project documents that many algorithms are unchanged and its table maps
+          # the 3e/4e equivalents.
+          candidates = {}
+          for path in source_root.glob('*.md'):
+              text = path.read_text(encoding='utf-8')
+              sections = {}
+              for edition in ('AIMA4e', 'AIMA3e'):
+                  m = re.search(r'(?ms)^## ' + edition + r'\s*\n(.*?)(?=^---\s*$|^## |\Z)', text)
+                  if m and m.group(1).strip():
+                      sections[edition] = clean(m.group(1))
+              for edition in ('AIMA4e', 'AIMA3e'):
+                  body = sections.get(edition)
+                  if not body:
+                      continue
+                  for name in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)', body):
+                      key = name.upper()
+                      # 4e always wins over 3e when both exist.
+                      if key not in candidates or edition == 'AIMA4e':
+                          candidates[key] = body
+
+          aliases = {
+              'MINIMAX-DECISION': 'MINIMAX-DECISION',
+              'MINIMAX-SEARCH': 'MINIMAX-DECISION',
+              'ALPHA-BETA-SEARCH': 'ALPHA-BETA-SEARCH',
+              'MONTE-CARLO-TREE-SEARCH': 'MONTE-CARLO-TREE-SEARCH',
+          }
+          block_re = re.compile(r'(?s)(<pre\s+class=["\']code["\']\s*>\s*<code[^>]*>)(.*?)(</code>\s*</pre>)')
+
+          def source_for(raw):
+              text = html.unescape(re.sub(r'<[^>]+>', '', raw))
+              names = [n.upper() for n in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)', text)]
+              for n in names:
+                  if n in aliases and aliases[n] in candidates:
+                      return candidates[aliases[n]]
+                  if n in candidates:
+                      return candidates[n]
+              # Some blocks contain only the second function of an algorithm.
+              for n in re.findall(r'\b[A-Z][A-Z0-9?*-]{4,}\b', text):
+                  n = n.upper()
+                  if n in aliases and aliases[n] in candidates:
+                      return candidates[aliases[n]]
+                  if n in candidates:
+                      return candidates[n]
+              return None
+
+          total = replaced = 0
+          changed = []
+          for path in sorted(root.glob('[0-9][0-9]-*.html')):
+              original = path.read_text(encoding='utf-8')
+              def replace(m):
+                  nonlocal total, replaced
+                  total += 1
+                  source = source_for(m.group(2))
+                  if source is None or persian.search(source):
+                      return m.group(0)
+                  replaced += 1
+                  return m.group(1) + html.escape(source, quote=False) + m.group(3)
+              updated = block_re.sub(replace, original)
+              if updated != original:
+                  path.write_text(updated, encoding='utf-8')
+                  changed.append(str(path))
+
+          # Only fail if an actual pseudocode block still contains Persian text.
+          remaining = []
+          for path in sorted(root.glob('[0-9][0-9]-*.html')):
+              text = path.read_text(encoding='utf-8')
+              for m in block_re.finditer(text):
+                  code = html.unescape(re.sub(r'<[^>]+>', '', m.group(2)))
+                  if persian.search(code) and re.search(r'\b(?:function|procedure)\b', code):
+                      remaining.append(str(path))
+          if remaining:
+              print('ERROR: Persian pseudocode remains in:', *sorted(set(remaining)), sep='\n- ')
+              raise SystemExit(1)
+          print(f'Pseudocode blocks found: {total}')
+          print(f'Pseudocode blocks replaced: {replaced}')
+          print(f'HTML files changed: {len(changed)}')
+          for p in changed: print('changed:', p)
+          PY
+      - name: Commit HTML changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git diff --quiet -- '*.html'; then
+            echo 'No HTML pseudocode changes to commit.'
+            exit 0
+          fi
+          git add -- '*.html'
+          git commit -m 'docs: replace HTML pseudocode with English AIMA 4e'
+          git push
