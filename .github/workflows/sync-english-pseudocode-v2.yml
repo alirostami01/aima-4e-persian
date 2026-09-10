@@ -16,34 +16,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL https://aima.eecs.berkeley.edu/algorithms.pdf -o /tmp/aima4e-algorithms.pdf
+          curl -fsSL https://aima.eecs.berkeley.edu/global-algorithms.pdf -o /tmp/aima4e-algorithms.pdf
           pdftotext -layout /tmp/aima4e-algorithms.pdf /tmp/aima4e-algorithms.txt
           python3 <<'PY'
           import html, pathlib, re
           root=pathlib.Path('.')
           pdf_text=pathlib.Path('/tmp/aima4e-algorithms.txt').read_text(encoding='utf-8',errors='replace').replace('\f','\n')
           persian=re.compile(r'[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]')
-
-          # The official algorithms PDF is the AIMA 4e pseudocode source.
-          # Each pseudocode figure begins with a function/procedure and ends at its Figure caption.
           function_re=re.compile(r'(?ms)^function\s+([A-Z][A-Z0-9?*_-]*)\b.*?(?=^Figure\s+\d+\.\d+\b|\Z)')
           sources={}
           for m in function_re.finditer(pdf_text):
-              name=m.group(1).upper()
-              body=m.group(0).rstrip()
-              # Remove obvious PDF page headers/footers that can occur between lines.
-              body=re.sub(r'(?m)^\s*CHAPTER\s+\d+\s*$', '', body)
-              body=re.sub(r'(?m)^\s*Chapter\s+\d+\s*$', '', body)
-              body=re.sub(r'(?m)^\s*\d+\s*$', '', body)
-              body=re.sub(r'\n{3,}', '\n\n', body).strip()
+              name=m.group(1).upper(); body=m.group(0).rstrip()
+              body=re.sub(r'(?m)^\s*(?:CHAPTER|Chapter)\s+\d+\s*$','',body)
+              body=re.sub(r'(?m)^\s*\d+\s*$','',body)
+              body=re.sub(r'\n{3,}','\n\n',body).strip()
               if not persian.search(body): sources[name]=body
-
-          aliases={
-              'MINIMAX-SEARCH':'MINIMAX-SEARCH',
-              'MINIMAX-DECISION':'MINIMAX-SEARCH',
-              'MAX-VALUE':'MINIMAX-SEARCH',
-              'MIN-VALUE':'MINIMAX-SEARCH',
-          }
+          aliases={'MINIMAX-DECISION':'MINIMAX-SEARCH','MAX-VALUE':'MINIMAX-SEARCH','MIN-VALUE':'MINIMAX-SEARCH'}
           block_re=re.compile(r'(?s)(<pre\s+class=["\']code["\']\s*>\s*<code[^>]*>)(.*?)(</code>\s*</pre>)')
           def source_for(raw):
               text=html.unescape(re.sub(r'<[^>]+>','',raw))
@@ -52,33 +40,22 @@ jobs:
                   key=aliases.get(n,n)
                   if key in sources: return sources[key]
               return None
-
-          html_files=sorted(root.glob('[0-9][0-9]-*.html'))
-          stats={'total':0,'replaced':0,'unmatched':0}
-          unmatched=[]; changed=[]
+          html_files=sorted(root.glob('[0-9][0-9]-*.html')); stats={'total':0,'replaced':0,'unmatched':0}; unmatched=[]; changed=[]
           for path in html_files:
               original=path.read_text(encoding='utf-8')
               def replace(match):
-                  stats['total']+=1
-                  source=source_for(match.group(2))
+                  stats['total']+=1; source=source_for(match.group(2))
                   if source is None:
-                      stats['unmatched']+=1
-                      preview=html.unescape(re.sub(r'<[^>]+>','',match.group(2))).strip().splitlines()[0][:100] if match.group(2).strip() else '<empty>'
-                      unmatched.append((str(path),preview))
-                      return match.group(0)
-                  stats['replaced']+=1
-                  return match.group(1)+html.escape(source,quote=False)+match.group(3)
+                      stats['unmatched']+=1; unmatched.append((str(path),html.unescape(re.sub(r'<[^>]+>','',match.group(2))).strip().splitlines()[0][:100])); return match.group(0)
+                  stats['replaced']+=1; return match.group(1)+html.escape(source,quote=False)+match.group(3)
               updated=block_re.sub(replace,original)
-              if updated!=original:
-                  path.write_text(updated,encoding='utf-8'); changed.append(str(path))
-
+              if updated!=original: path.write_text(updated,encoding='utf-8'); changed.append(str(path))
           remaining=[]
           for path in html_files:
               text=path.read_text(encoding='utf-8')
               for m in block_re.finditer(text):
                   code=html.unescape(re.sub(r'<[^>]+>','',m.group(2)))
-                  if persian.search(code) and re.search(r'\b(?:function|procedure)\b',code):
-                      remaining.append((str(path),code.splitlines()[0].strip() if code.splitlines() else '<empty>'))
+                  if persian.search(code) and re.search(r'\b(?:function|procedure)\b',code): remaining.append((str(path),code.splitlines()[0].strip()))
           print(f"HTML files scanned: {len(html_files)}")
           print(f"Pseudocode blocks found: {stats['total']}")
           print(f"Pseudocode blocks replaced from AIMA 4e PDF: {stats['replaced']}")
@@ -86,12 +63,9 @@ jobs:
           print(f"Files changed: {len(changed)}")
           for x in changed: print('changed:',x)
           if unmatched:
-              print('UNMATCHED:')
-              for p,x in unmatched: print('-',p,':',x)
+              print('UNMATCHED:'); [print('-',p,':',x) for p,x in unmatched]
           if remaining:
-              print('ERROR: Persian pseudocode remains:')
-              for p,x in sorted(set(remaining)): print('-',p,':',x)
-              raise SystemExit(1)
+              print('ERROR: Persian pseudocode remains:'); [print('-',p,':',x) for p,x in sorted(set(remaining))]; raise SystemExit(1)
           PY
       - name: Commit synchronized HTML files
         shell: bash
