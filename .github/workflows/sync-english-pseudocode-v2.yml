@@ -1,0 +1,118 @@
+name: Sync English AIMA 4e pseudocode v2
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Sync pseudocode
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/aimacode/aima-pseudocode.git /tmp/aima-pseudocode
+          python3 <<'PY'
+          import html, pathlib, re
+          root = pathlib.Path('.')
+          source_root = pathlib.Path('/tmp/aima-pseudocode/md')
+          sources = {}
+          for path in source_root.glob('*.md'):
+              text = path.read_text(encoding='utf-8')
+              m = re.search(r'(?ms)^## AIMA4e\s*\n(.*?)(?=^---\s*$|^## |\Z)', text)
+              if m and m.group(1).strip():
+                  sources[path.stem.lower().replace('_','-').replace(' ','-')] = m.group(1).strip()
+          def clean(md):
+              md = re.split(r'(?m)^__FIGURE\b', md, maxsplit=1)[0]
+              md = html.unescape(md)
+              md = re.sub(r'<a\b[^>]*>(.*?)</a>', r'\1', md, flags=re.S)
+              md = re.sub(r'<img\b[^>]*>', '', md, flags=re.S)
+              md = re.sub(r'<[^>]+>', '', md).replace('&emsp;', '    ')
+              for old,new in {
+                  '__function__':'function','__returns__':'returns','__return__':'return',
+                  '__if__':'if','__then__':'then','__else__':'else','__for each__':'for each',
+                  '__in__':'in','__do__':'do','__while__':'while','__or__':'or',
+                  '__and__':'and','__not__':'not','__true__':'true','__false__':'false'
+              }.items(): md = re.sub(old,new,md)
+              md = re.sub(r'\\-','-',md)
+              md = re.sub(r'\\([*_])',r'\1',md)
+              md = re.sub(r'(?<!\w)_([^_\n]+)_(?!\w)',r'\1',md)
+              md = re.sub(r'\*\*([^*]+)\*\*',r'\1',md)
+              lines=[x.rstrip() for x in md.splitlines() if not re.match(r'^#{1,6}\s',x)]
+              while lines and not lines[0].strip(): lines.pop(0)
+              while lines and not lines[-1].strip(): lines.pop()
+              return '\n'.join(lines)
+          source_text={k:clean(v) for k,v in sources.items()}
+          function_index={}
+          for filename,body in source_text.items():
+              for name in set(re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)',body)):
+                  function_index.setdefault(name.upper(),set()).add(filename)
+          aliases={
+              'MINIMAX-DECISION':'minimax-decision','MAX-VALUE':'minimax-decision','MIN-VALUE':'minimax-decision',
+              'ALPHA-BETA-SEARCH':'alpha-beta-search','MAX-VALUE-AB':'alpha-beta-search','MIN-VALUE-AB':'alpha-beta-search',
+              'MONTE-CARLO-TREE-SEARCH':'monte-carlo-tree-search'
+          }
+          filename_aliases={'minimax-search':'minimax-decision','lrta*-agent':'lrtastar-agent'}
+          persian=re.compile(r'[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]')
+          block_re=re.compile(r'(?s)(<pre\s+class=["\']code["\']\s*>\s*<code[^>]*>)(.*?)(</code>\s*</pre>)')
+          def candidate(raw):
+              text=html.unescape(re.sub(r'<[^>]+>','',raw)).replace('\\-','-')
+              for n in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)',text):
+                  n=n.upper()
+                  if n in aliases: return aliases[n]
+                  if n in function_index and len(function_index[n])==1: return next(iter(function_index[n]))
+              for n in re.findall(r'\b[A-Z][A-Z0-9?*-]{4,}\b',text):
+                  if n in aliases: return aliases[n]
+                  if n in function_index and len(function_index[n])==1: return next(iter(function_index[n]))
+              return None
+          html_files=sorted(root.glob('[0-9][0-9]-*.html'))
+          stats=[0,0]
+          changed=[]; unmatched=[]
+          for path in html_files:
+              original=path.read_text(encoding='utf-8')
+              def replace(match):
+                  stats[0]+=1
+                  key=candidate(match.group(2))
+                  if not key:
+                      unmatched.append(f'{path}: {html.unescape(match.group(2))[:100].replace(chr(10)," ")}')
+                      return match.group(0)
+                  key=filename_aliases.get(key,key)
+                  if key not in source_text:
+                      unmatched.append(f'{path}: {key}')
+                      return match.group(0)
+                  new=source_text[key]
+                  if persian.search(new): raise SystemExit(f'Persian source pseudocode: {key}')
+                  stats[1]+=1
+                  return match.group(1)+html.escape(new,quote=False)+match.group(3)
+              updated=block_re.sub(replace,original)
+              if updated!=original:
+                  path.write_text(updated,encoding='utf-8'); changed.append(str(path))
+          print(f'HTML files scanned: {len(html_files)}')
+          print(f'Pseudocode blocks found: {stats[0]}')
+          print(f'Pseudocode blocks replaced: {stats[1]}')
+          print(f'Files changed: {len(changed)}')
+          for x in changed: print('changed:',x)
+          if unmatched:
+              print('Unmatched blocks:',len(unmatched))
+              for x in unmatched[:80]: print('-',x)
+          for path in html_files:
+              text=path.read_text(encoding='utf-8')
+              for m in block_re.finditer(text):
+                  code=html.unescape(re.sub(r'<[^>]+>','',m.group(2)))
+                  if persian.search(code): raise SystemExit(f'Persian text remains in code block: {path}')
+          PY
+      - name: Commit synchronized HTML files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add '*.html'
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs: use English AIMA 4e pseudocode in HTML"
+          git push
