@@ -19,36 +19,21 @@ jobs:
           git clone --depth 1 https://github.com/aimacode/aima-pseudocode.git /tmp/aima-pseudocode
           python3 <<'PY'
           import html, pathlib, re
-          root = pathlib.Path('.')
-          source_root = pathlib.Path('/tmp/aima-pseudocode/md')
-          persian = re.compile(r'[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]')
-
+          root=pathlib.Path('.')
+          source_root=pathlib.Path('/tmp/aima-pseudocode/md')
+          persian=re.compile(r'[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]')
           def clean(md):
-              md = re.split(r'(?m)^__FIGURE\b', md, maxsplit=1)[0]
-              md = html.unescape(md)
-              md = re.sub(r'<[^>]+>', '', md)
-              for old,new in {
-                  '__function__':'function','__procedure__':'procedure','__returns__':'returns','__return__':'return',
-                  '__if__':'if','__then__':'then','__else__':'else','__for each__':'for each',
-                  '__in__':'in','__do__':'do','__while__':'while','__or__':'or',
-                  '__and__':'and','__not__':'not','__true__':'true','__false__':'false'
-              }.items(): md = md.replace(old,new)
-              md = re.sub(r'\\-','-',md)
-              md = re.sub(r'\\([*_])',r'\1',md)
-              md = re.sub(r'(?<!\w)_([^_\n]+)_(?!\w)',r'\1',md)
-              md = re.sub(r'\*\*([^*]+)\*\*',r'\1',md)
+              md=re.split(r'(?m)^__FIGURE\b',md,maxsplit=1)[0]
+              md=html.unescape(md); md=re.sub(r'<[^>]+>','',md)
+              for old,new in {'__function__':'function','__procedure__':'procedure','__returns__':'returns','__return__':'return','__if__':'if','__then__':'then','__else__':'else','__for each__':'for each','__in__':'in','__do__':'do','__while__':'while','__or__':'or','__and__':'and','__not__':'not','__true__':'true','__false__':'false'}.items(): md=md.replace(old,new)
+              md=re.sub(r'\\-','-',md); md=re.sub(r'\\([*_])',r'\1',md); md=re.sub(r'(?<!\w)_([^_\n]+)_(?!\w)',r'\1',md); md=re.sub(r'\*\*([^*]+)\*\*',r'\1',md)
               lines=[x.rstrip() for x in md.splitlines() if not re.match(r'^#{1,6}\s',x)]
               while lines and not lines[0].strip(): lines.pop(0)
               while lines and not lines[-1].strip(): lines.pop()
               return '\n'.join(lines)
-
-          # Prefer official AIMA4e pseudocode. Where the upstream markdown has not
-          # yet been updated to 4e, use its AIMA3e section for algorithms mapped as
-          # unchanged/equivalent by the official repository.
           candidates={}
           for path in source_root.glob('*.md'):
-              text=path.read_text(encoding='utf-8')
-              sections={}
+              text=path.read_text(encoding='utf-8'); sections={}
               for edition in ('AIMA4e','AIMA3e'):
                   m=re.search(r'(?ms)^## '+edition+r'\s*\n(.*?)(?=^---\s*$|^## |\Z)',text)
                   if m and m.group(1).strip(): sections[edition]=clean(m.group(1))
@@ -58,17 +43,8 @@ jobs:
                   for name in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)',body):
                       key=name.upper()
                       if key not in candidates or edition=='AIMA4e': candidates[key]=body
-
-          aliases={
-              'MINIMAX-SEARCH':'MINIMAX-DECISION',
-              'MINIMAX-DECISION':'MINIMAX-DECISION',
-              'MAX-VALUE':'MINIMAX-DECISION',
-              'MIN-VALUE':'MINIMAX-DECISION',
-              'ALPHA-BETA-SEARCH':'ALPHA-BETA-SEARCH',
-              'MONTE-CARLO-TREE-SEARCH':'MONTE-CARLO-TREE-SEARCH'
-          }
+          aliases={'MINIMAX-SEARCH':'MINIMAX-DECISION','MINIMAX-DECISION':'MINIMAX-DECISION','MAX-VALUE':'MINIMAX-DECISION','MIN-VALUE':'MINIMAX-DECISION','ALPHA-BETA-SEARCH':'ALPHA-BETA-SEARCH','MONTE-CARLO-TREE-SEARCH':'MONTE-CARLO-TREE-SEARCH'}
           block_re=re.compile(r'(?s)(<pre\s+class=["\']code["\']\s*>\s*<code[^>]*>)(.*?)(</code>\s*</pre>)')
-
           def source_for(raw):
               text=html.unescape(re.sub(r'<[^>]+>','',raw)).replace('\\-','-')
               names=[n.upper() for n in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)',text)]
@@ -76,38 +52,23 @@ jobs:
                   if n in aliases and aliases[n] in candidates: return candidates[aliases[n]]
                   if n in candidates: return candidates[n]
               return None
-
-          html_files=sorted(root.glob('[0-9][0-9]-*.html'))
-          total=replaced=0
-          changed=[]
+          html_files=sorted(root.glob('[0-9][0-9]-*.html')); stats={'total':0,'replaced':0}; changed=[]
           for path in html_files:
               original=path.read_text(encoding='utf-8')
               def replace(match):
-                  nonlocal total,replaced
-                  total += 1
-                  source=source_for(match.group(2))
+                  stats['total']+=1; source=source_for(match.group(2))
                   if source is None or persian.search(source): return match.group(0)
-                  replaced += 1
-                  return match.group(1)+html.escape(source,quote=False)+match.group(3)
+                  stats['replaced']+=1; return match.group(1)+html.escape(source,quote=False)+match.group(3)
               updated=block_re.sub(replace,original)
-              if updated!=original:
-                  path.write_text(updated,encoding='utf-8')
-                  changed.append(str(path))
-
+              if updated!=original: path.write_text(updated,encoding='utf-8'); changed.append(str(path))
           remaining=[]
           for path in html_files:
               text=path.read_text(encoding='utf-8')
               for m in block_re.finditer(text):
                   code=html.unescape(re.sub(r'<[^>]+>','',m.group(2)))
-                  if persian.search(code) and re.search(r'\b(?:function|procedure)\b',code):
-                      remaining.append(str(path))
-          if remaining:
-              print('Persian pseudocode remains:', *sorted(set(remaining)), sep='\n- ')
-              raise SystemExit(1)
-          print(f'HTML files scanned: {len(html_files)}')
-          print(f'Pseudocode blocks found: {total}')
-          print(f'Pseudocode blocks replaced: {replaced}')
-          print(f'Files changed: {len(changed)}')
+                  if persian.search(code) and re.search(r'\b(?:function|procedure)\b',code): remaining.append(str(path))
+          if remaining: print('Persian pseudocode remains:',*sorted(set(remaining)),sep='\n- '); raise SystemExit(1)
+          print(f"HTML files scanned: {len(html_files)}"); print(f"Pseudocode blocks found: {stats['total']}"); print(f"Pseudocode blocks replaced: {stats['replaced']}"); print(f"Files changed: {len(changed)}")
           for x in changed: print('changed:',x)
           PY
       - name: Commit synchronized HTML files
