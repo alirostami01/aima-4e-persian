@@ -1,2 +1,0 @@
-temporary trigger for direct AIMA 4e pseudocode synchronization
-rerun-berkeley
