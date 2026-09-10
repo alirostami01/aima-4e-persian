@@ -25,7 +25,7 @@ jobs:
           root=pathlib.Path('.')
           pdf_text=pathlib.Path('/tmp/aima4e-algorithms.txt').read_text(encoding='utf-8',errors='replace').replace('\f','\n')
           persian=re.compile(r'[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]')
-          function_re=re.compile(r'(?ms)^function\s+([A-Z][A-Z0-9?*_-]*)\b.*?(?=^Figure\s+\d+\.\d+\b|\Z)')
+          function_re=re.compile(r'(?ms)^\s*function\s+([A-Z][A-Z0-9?*_-]*)\b.*?(?=^\s*Figure\s+\d+\.\d+\b|\Z)')
           sources={}
           for m in function_re.finditer(pdf_text):
               name=m.group(1).upper(); body=m.group(0).rstrip()
