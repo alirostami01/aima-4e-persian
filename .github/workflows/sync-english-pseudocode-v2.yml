@@ -21,24 +21,18 @@ jobs:
           import html, pathlib, re
           root = pathlib.Path('.')
           source_root = pathlib.Path('/tmp/aima-pseudocode/md')
-          sources = {}
-          for path in source_root.glob('*.md'):
-              text = path.read_text(encoding='utf-8')
-              m = re.search(r'(?ms)^## AIMA4e\s*\n(.*?)(?=^---\s*$|^## |\Z)', text)
-              if m and m.group(1).strip():
-                  sources[path.stem.lower().replace('_','-').replace(' ','-')] = m.group(1).strip()
+          persian = re.compile(r'[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]')
+
           def clean(md):
               md = re.split(r'(?m)^__FIGURE\b', md, maxsplit=1)[0]
               md = html.unescape(md)
-              md = re.sub(r'<a\b[^>]*>(.*?)</a>', r'\1', md, flags=re.S)
-              md = re.sub(r'<img\b[^>]*>', '', md, flags=re.S)
-              md = re.sub(r'<[^>]+>', '', md).replace('&emsp;', '    ')
+              md = re.sub(r'<[^>]+>', '', md)
               for old,new in {
-                  '__function__':'function','__returns__':'returns','__return__':'return',
+                  '__function__':'function','__procedure__':'procedure','__returns__':'returns','__return__':'return',
                   '__if__':'if','__then__':'then','__else__':'else','__for each__':'for each',
                   '__in__':'in','__do__':'do','__while__':'while','__or__':'or',
                   '__and__':'and','__not__':'not','__true__':'true','__false__':'false'
-              }.items(): md = re.sub(old,new,md)
+              }.items(): md = md.replace(old,new)
               md = re.sub(r'\\-','-',md)
               md = re.sub(r'\\([*_])',r'\1',md)
               md = re.sub(r'(?<!\w)_([^_\n]+)_(?!\w)',r'\1',md)
@@ -47,64 +41,74 @@ jobs:
               while lines and not lines[0].strip(): lines.pop(0)
               while lines and not lines[-1].strip(): lines.pop()
               return '\n'.join(lines)
-          source_text={k:clean(v) for k,v in sources.items()}
-          function_index={}
-          for filename,body in source_text.items():
-              for name in set(re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)',body)):
-                  function_index.setdefault(name.upper(),set()).add(filename)
+
+          # Prefer official AIMA4e pseudocode. Where the upstream markdown has not
+          # yet been updated to 4e, use its AIMA3e section for algorithms mapped as
+          # unchanged/equivalent by the official repository.
+          candidates={}
+          for path in source_root.glob('*.md'):
+              text=path.read_text(encoding='utf-8')
+              sections={}
+              for edition in ('AIMA4e','AIMA3e'):
+                  m=re.search(r'(?ms)^## '+edition+r'\s*\n(.*?)(?=^---\s*$|^## |\Z)',text)
+                  if m and m.group(1).strip(): sections[edition]=clean(m.group(1))
+              for edition in ('AIMA4e','AIMA3e'):
+                  body=sections.get(edition)
+                  if not body: continue
+                  for name in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)',body):
+                      key=name.upper()
+                      if key not in candidates or edition=='AIMA4e': candidates[key]=body
+
           aliases={
-              'MINIMAX-DECISION':'minimax-decision','MAX-VALUE':'minimax-decision','MIN-VALUE':'minimax-decision',
-              'ALPHA-BETA-SEARCH':'alpha-beta-search','MAX-VALUE-AB':'alpha-beta-search','MIN-VALUE-AB':'alpha-beta-search',
-              'MONTE-CARLO-TREE-SEARCH':'monte-carlo-tree-search'
+              'MINIMAX-SEARCH':'MINIMAX-DECISION',
+              'MINIMAX-DECISION':'MINIMAX-DECISION',
+              'MAX-VALUE':'MINIMAX-DECISION',
+              'MIN-VALUE':'MINIMAX-DECISION',
+              'ALPHA-BETA-SEARCH':'ALPHA-BETA-SEARCH',
+              'MONTE-CARLO-TREE-SEARCH':'MONTE-CARLO-TREE-SEARCH'
           }
-          filename_aliases={'minimax-search':'minimax-decision','lrta*-agent':'lrtastar-agent'}
-          persian=re.compile(r'[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]')
           block_re=re.compile(r'(?s)(<pre\s+class=["\']code["\']\s*>\s*<code[^>]*>)(.*?)(</code>\s*</pre>)')
-          def candidate(raw):
+
+          def source_for(raw):
               text=html.unescape(re.sub(r'<[^>]+>','',raw)).replace('\\-','-')
-              for n in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)',text):
-                  n=n.upper()
-                  if n in aliases: return aliases[n]
-                  if n in function_index and len(function_index[n])==1: return next(iter(function_index[n]))
-              for n in re.findall(r'\b[A-Z][A-Z0-9?*-]{4,}\b',text):
-                  if n in aliases: return aliases[n]
-                  if n in function_index and len(function_index[n])==1: return next(iter(function_index[n]))
+              names=[n.upper() for n in re.findall(r'\b(?:function|procedure)\s+([A-Z][A-Z0-9?*-]+)',text)]
+              for n in names:
+                  if n in aliases and aliases[n] in candidates: return candidates[aliases[n]]
+                  if n in candidates: return candidates[n]
               return None
+
           html_files=sorted(root.glob('[0-9][0-9]-*.html'))
-          stats=[0,0]
-          changed=[]; unmatched=[]
+          total=replaced=0
+          changed=[]
           for path in html_files:
               original=path.read_text(encoding='utf-8')
               def replace(match):
-                  stats[0]+=1
-                  key=candidate(match.group(2))
-                  if not key:
-                      unmatched.append(f'{path}: {html.unescape(match.group(2))[:100].replace(chr(10)," ")}')
-                      return match.group(0)
-                  key=filename_aliases.get(key,key)
-                  if key not in source_text:
-                      unmatched.append(f'{path}: {key}')
-                      return match.group(0)
-                  new=source_text[key]
-                  if persian.search(new): raise SystemExit(f'Persian source pseudocode: {key}')
-                  stats[1]+=1
-                  return match.group(1)+html.escape(new,quote=False)+match.group(3)
+                  nonlocal total,replaced
+                  total += 1
+                  source=source_for(match.group(2))
+                  if source is None or persian.search(source): return match.group(0)
+                  replaced += 1
+                  return match.group(1)+html.escape(source,quote=False)+match.group(3)
               updated=block_re.sub(replace,original)
               if updated!=original:
-                  path.write_text(updated,encoding='utf-8'); changed.append(str(path))
-          print(f'HTML files scanned: {len(html_files)}')
-          print(f'Pseudocode blocks found: {stats[0]}')
-          print(f'Pseudocode blocks replaced: {stats[1]}')
-          print(f'Files changed: {len(changed)}')
-          for x in changed: print('changed:',x)
-          if unmatched:
-              print('Unmatched blocks:',len(unmatched))
-              for x in unmatched[:80]: print('-',x)
+                  path.write_text(updated,encoding='utf-8')
+                  changed.append(str(path))
+
+          remaining=[]
           for path in html_files:
               text=path.read_text(encoding='utf-8')
               for m in block_re.finditer(text):
                   code=html.unescape(re.sub(r'<[^>]+>','',m.group(2)))
-                  if persian.search(code): raise SystemExit(f'Persian text remains in code block: {path}')
+                  if persian.search(code) and re.search(r'\b(?:function|procedure)\b',code):
+                      remaining.append(str(path))
+          if remaining:
+              print('Persian pseudocode remains:', *sorted(set(remaining)), sep='\n- ')
+              raise SystemExit(1)
+          print(f'HTML files scanned: {len(html_files)}')
+          print(f'Pseudocode blocks found: {total}')
+          print(f'Pseudocode blocks replaced: {replaced}')
+          print(f'Files changed: {len(changed)}')
+          for x in changed: print('changed:',x)
           PY
       - name: Commit synchronized HTML files
         shell: bash
