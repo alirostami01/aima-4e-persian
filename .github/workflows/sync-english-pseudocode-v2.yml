@@ -16,8 +16,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL https://aima.eecs.berkeley.edu/global-algorithms.pdf -o /tmp/aima4e-algorithms.pdf
-          pdftotext -layout /tmp/aima4e-algorithms.pdf /tmp/aima4e-algorithms.txt
+          git clone --depth 1 https://github.com/aimacode/aima-pseudocode.git /tmp/aima-pseudocode
+          pdftotext -layout /tmp/aima-pseudocode/algorithms.pdf /tmp/aima4e-algorithms.txt
           python3 <<'PY'
           import html, pathlib, re
           root=pathlib.Path('.')
