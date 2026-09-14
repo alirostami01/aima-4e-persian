@@ -1,6 +1,15 @@
 # هوش مصنوعی: یک رویکرد مدرن — ترجمهٔ فارسی
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Language-Persian%20%28فارسی%29-blue?style=for-the-badge" alt="Persian Language" />
+  <img src="https://img.shields.io/badge/Topic-Artificial%20Intelligence-purple?style=for-the-badge" alt="Artificial Intelligence" />
+  <img src="https://img.shields.io/badge/Topic-Machine%20Learning-green?style=for-the-badge" alt="Machine Learning" />
+  <img src="https://img.shields.io/badge/Topic-Deep%20Learning-orange?style=for-the-badge" alt="Deep Learning" />
+  <img src="https://img.shields.io/badge/Topic-NLP-red?style=for-the-badge" alt="Natural Language Processing" />
+  <img src="https://img.shields.io/badge/Topic-Robotics-yellow?style=for-the-badge" alt="Robotics" />
+</p>
+
+<p align="center">
   <strong>Artificial Intelligence: A Modern Approach — 4th Edition</strong>
   <br />
   <sub>ترجمه و آماده‌سازی فارسی کتاب «هوش مصنوعی: یک رویکرد مدرن» اثر استوارت راسل و پیتر نورویگ</sub>
@@ -177,4 +186,3 @@ figures/
   <br />
   <a href="https://www.alirostami.com/support/">❤️ حمایت از ادامهٔ پروژه</a>
 </p>
-

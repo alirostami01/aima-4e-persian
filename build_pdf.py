@@ -120,12 +120,7 @@ def render_chapters(chapters: list[tuple[int, Path]], temp_dir: Path):
 
 
 def find_font() -> str | None:
-    """Find a Unicode font that can be explicitly embedded in the TOC.
-
-    Fontconfig is preferred because it reflects the fonts actually available
-    to Pango/WeasyPrint on the current machine. The fallback paths keep the
-    script usable on common Debian/Ubuntu installations without fontconfig.
-    """
+    """Find a Unicode font that can be explicitly embedded in the TOC."""
     patterns = (
         "Noto Sans Arabic:style=Regular",
         "Noto Sans:style=Regular",
@@ -157,12 +152,7 @@ def find_font() -> str | None:
 
 
 def make_toc_pdf(entries: list[tuple[int, str, int]], output: Path, font_path: str | None):
-    """Render a compact Persian TOC with WeasyPrint.
-
-    The TOC is rendered as real RTL text instead of ReportLab text primitives,
-    which avoids the reversed/unshaped Persian text seen in the old TOC.
-    Returns (page_count, clickable row rectangles) in PDF points.
-    """
+    """Render the Persian TOC and return its page count and row rectangles."""
     if not font_path:
         raise RuntimeError(
             "No Unicode font was found for the Persian TOC. Install Noto Sans "
@@ -200,48 +190,14 @@ body {{
   direction: rtl;
   color: #222;
 }}
-.header {{
-  height: 58pt;
-  margin: 0;
-  text-align: center;
-}}
-.header h1 {{
-  margin: 0 0 5pt;
-  font-size: 19pt;
-  line-height: 23pt;
-  font-weight: 700;
-}}
-.header p {{
-  margin: 0;
-  font-size: 9pt;
-  line-height: 11pt;
-}}
+.header {{ height: 58pt; margin: 0; text-align: center; }}
+.header h1 {{ margin: 0 0 5pt; font-size: 19pt; line-height: 23pt; font-weight: 700; }}
+.header p {{ margin: 0; font-size: 9pt; line-height: 11pt; }}
 .toc-list {{ margin: 0; padding: 0; }}
-.toc-row {{
-  height: 21pt;
-  page-break-inside: avoid;
-  display: flex;
-  align-items: center;
-  direction: rtl;
-}}
-.toc-title {{
-  flex: 0 1 auto;
-  white-space: nowrap;
-  direction: rtl;
-  unicode-bidi: isolate;
-}}
-.toc-dots {{
-  flex: 1 1 auto;
-  min-width: 10pt;
-  border-bottom: 1px dotted #888;
-  margin: 0 8pt 3pt;
-}}
-.toc-page {{
-  flex: 0 0 28pt;
-  direction: ltr;
-  unicode-bidi: isolate;
-  text-align: left;
-}}
+.toc-row {{ height: 21pt; page-break-inside: avoid; display: flex; align-items: center; direction: rtl; }}
+.toc-title {{ flex: 0 1 auto; white-space: nowrap; direction: rtl; unicode-bidi: isolate; }}
+.toc-dots {{ flex: 1 1 auto; min-width: 10pt; border-bottom: 1px dotted #888; margin: 0 8pt 3pt; }}
+.toc-page {{ flex: 0 0 28pt; direction: ltr; unicode-bidi: isolate; text-align: left; }}
 </style>
 </head>
 <body>
@@ -258,8 +214,6 @@ body {{
     if pages <= 0:
         raise RuntimeError("TOC PDF is empty")
 
-    # The CSS above intentionally uses fixed dimensions. This makes the
-    # annotation rectangles deterministic and keeps them aligned with rows.
     page_width, page_height = A4
     margin_left = 17 * 72 / 25.4
     margin_top = 15 * 72 / 25.4
@@ -318,6 +272,107 @@ def add_internal_link(page, rect, target_page):
     annots.append(annotation)
 
 
+def _outline_title(item) -> str:
+    """Return an outline item's title without depending on a pypdf version."""
+    title = getattr(item, "title", None)
+    if title is None and isinstance(item, dict):
+        title = item.get("/Title")
+    return str(title or "").strip()
+
+
+def _copy_outline_items(
+    writer: PdfWriter,
+    reader: PdfReader,
+    items,
+    page_offset: int,
+    parent=None,
+    skip_first_root: bool = False,
+) -> int:
+    """Copy a pypdf outline tree into the merged writer.
+
+    WeasyPrint creates the detailed heading outline in each chapter PDF. Once
+    chapter PDFs are merged, those destinations still point at the source
+    reader's page tree, so they cannot simply be reused. This function resolves
+    every destination to its source page number and recreates it against the
+    final writer with the chapter page offset applied.
+
+    Nested lists returned by PdfReader.outline represent child bookmarks.
+    """
+    copied = 0
+    index = 0
+    while index < len(items):
+        item = items[index]
+        if isinstance(item, list):
+            index += 1
+            continue
+
+        title = _outline_title(item)
+        try:
+            source_page = reader.get_destination_page_number(item)
+        except Exception:
+            source_page = None
+
+        children = items[index + 1] if index + 1 < len(items) and isinstance(items[index + 1], list) else None
+
+        if skip_first_root and copied == 0:
+            # The chapter-level bookmark is already created by build(). Keep
+            # its children, but avoid creating a duplicate chapter bookmark.
+            if children:
+                copied += _copy_outline_items(
+                    writer, reader, children, page_offset, parent=parent
+                )
+            index += 2 if children is not None else 1
+            continue
+
+        new_parent = parent
+        if source_page is not None and title:
+            final_page = page_offset + source_page
+            new_parent = writer.add_outline_item(title, final_page, parent=parent)
+            copied += 1
+
+        if children:
+            copied += _copy_outline_items(
+                writer, reader, children, page_offset, parent=new_parent
+            )
+            index += 2
+        else:
+            index += 1
+
+    return copied
+
+
+def add_chapter_outlines(
+    writer: PdfWriter,
+    rendered,
+    chapter_indices: dict[int, int],
+) -> int:
+    """Create chapter bookmarks and preserve all detailed chapter headings."""
+    total = 0
+    for number, title, chapter_pdf, _pages in rendered:
+        chapter_reader = PdfReader(str(chapter_pdf))
+        chapter_root = writer.add_outline_item(
+            f"{number:02d}. {title}", chapter_indices[number]
+        )
+        outline = chapter_reader.outline
+        if not outline:
+            continue
+
+        # Usually the first root item is the chapter <h1>/<h2> itself. It is
+        # redundant because chapter_root above already represents that level.
+        # Its children are nevertheless copied under the chapter root.
+        copied = _copy_outline_items(
+            writer,
+            chapter_reader,
+            outline,
+            page_offset=chapter_indices[number],
+            parent=chapter_root,
+            skip_first_root=True,
+        )
+        total += copied
+
+    return total
+
+
 def build(output: Path, keep_chapters: bool = False) -> None:
     chapters = discover_chapters()
     PDF_DIR.mkdir(parents=True, exist_ok=True)
@@ -366,15 +421,14 @@ def build(output: Path, keep_chapters: bool = False) -> None:
 
         chapter_indices = {}
         current_index = toc_pages
-        for number, title, chapter_pdf, _pages in rendered:
+        for number, _title, chapter_pdf, _pages in rendered:
             chapter_indices[number] = current_index
             for page in PdfReader(str(chapter_pdf)).pages:
                 writer.add_page(page)
                 current_index += 1
 
+        heading_count = add_chapter_outlines(writer, rendered, chapter_indices)
         writer.add_outline_item("فهرست مطالب", 0)
-        for number, title, _pdf, _pages in rendered:
-            writer.add_outline_item(f"{number:02d}. {title}", chapter_indices[number])
 
         for row_index, (number, _title, _page_number) in enumerate(entries):
             if row_index >= len(toc_rects):
@@ -412,16 +466,22 @@ def build(output: Path, keep_chapters: bool = False) -> None:
         print(f"Output : {output}")
         print(f"Pages  : {len(final_reader.pages)}")
         print(f"Size   : {output.stat().st_size / (1024 * 1024):.2f} MB")
-        print("TOC    : clickable + page numbers")
-        print("Outline: chapter bookmarks")
+        print(f"TOC    : clickable + page numbers")
+        print(f"Outline: chapter bookmarks + {heading_count} detailed heading bookmarks")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build the complete AIMA Persian PDF")
-    parser.add_argument("-o", "--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--keep-chapters", action="store_true")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "-o", "--output", type=Path, default=DEFAULT_OUTPUT,
+        help=f"Output PDF path (default: {DEFAULT_OUTPUT})",
+    )
+    parser.add_argument(
+        "--keep-chapters", action="store_true",
+        help="Also copy rendered chapter PDFs to pdf/chapters/",
+    )
     args = parser.parse_args()
-    build(args.output.resolve(), args.keep_chapters)
+    build(args.output, args.keep_chapters)
 
 
 if __name__ == "__main__":
