@@ -8,6 +8,7 @@ import argparse
 import io
 import re
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -119,6 +120,31 @@ def render_chapters(chapters: list[tuple[int, Path]], temp_dir: Path):
 
 
 def find_font() -> str | None:
+    """Find a Unicode font that can be explicitly embedded in the TOC.
+
+    Fontconfig is preferred because it reflects the fonts actually available
+    to Pango/WeasyPrint on the current machine. The fallback paths keep the
+    script usable on common Debian/Ubuntu installations without fontconfig.
+    """
+    patterns = (
+        "Noto Sans Arabic:style=Regular",
+        "Noto Sans:style=Regular",
+        "DejaVu Sans:style=Book",
+    )
+    for pattern in patterns:
+        try:
+            result = subprocess.run(
+                ["fc-match", "-f", "%{file}", pattern],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            candidate = Path(result.stdout.strip())
+            if candidate.exists():
+                return str(candidate)
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            pass
+
     for candidate in (
         "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
         "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
@@ -131,10 +157,11 @@ def find_font() -> str | None:
 
 
 def make_toc_pdf(entries: list[tuple[int, str, int]], output: Path, font_path: str | None):
-    """Render the TOC with WeasyPrint so Persian shaping and RTL are correct.
+    """Render a compact Persian TOC with WeasyPrint.
 
-    Returns (page_count, clickable row rectangles). Rectangles are PDF points
-    measured from the bottom-left, one tuple per TOC entry.
+    The TOC is rendered as real RTL text instead of ReportLab text primitives,
+    which avoids the reversed/unshaped Persian text seen in the old TOC.
+    Returns (page_count, clickable row rectangles) in PDF points.
     """
     if not font_path:
         raise RuntimeError(
@@ -142,18 +169,14 @@ def make_toc_pdf(entries: list[tuple[int, str, int]], output: Path, font_path: s
             "or DejaVu Sans and run the build again."
         )
 
-    # Keep the TOC deliberately compact so all 29 chapters normally fit on one
-    # page. The layout is fixed enough that the clickable row rectangles can be
-    # mapped reliably into the merged PDF afterwards.
     rows = []
     for number, title, page_number in entries:
         rows.append(
-            f'<div class="toc-row" data-number="{number:02d}">'
-            f'<a href="#chapter-{number:02d}">'
-            f'<span class="toc-title">{number:02d}. {escape_html(title)}</span>'
+            f'<div class="toc-row">'
+            f'<span class="toc-title" dir="rtl"><bdi>{number:02d}. {escape_html(title)}</bdi></span>'
             f'<span class="toc-dots"></span>'
-            f'<span class="toc-page">{page_number}</span>'
-            f'</a></div>'
+            f'<span class="toc-page" dir="ltr">{page_number}</span>'
+            f'</div>'
         )
 
     font_face = Path(font_path).as_uri()
@@ -171,43 +194,60 @@ def make_toc_pdf(entries: list[tuple[int, str, int]], output: Path, font_path: s
 * {{ box-sizing: border-box; }}
 html, body {{ margin: 0; padding: 0; direction: rtl; }}
 body {{
-  font-family: AIMA-Persian, sans-serif;
-  font-size: 10.2pt;
+  font-family: AIMA-Persian, "Noto Sans Arabic", "DejaVu Sans", sans-serif;
+  font-size: 10pt;
   line-height: 1.2;
   direction: rtl;
   color: #222;
 }}
-.header {{ text-align: center; margin: 0 0 12pt; }}
-.header h1 {{ margin: 0 0 5pt; font-size: 19pt; font-weight: 700; }}
-.header p {{ margin: 0; font-size: 9pt; }}
-.toc-list {{ margin-top: 7pt; }}
-.toc-row {{ height: 22.1pt; page-break-inside: avoid; }}
-.toc-row a {{
+.header {{
+  height: 58pt;
+  margin: 0;
+  text-align: center;
+}}
+.header h1 {{
+  margin: 0 0 5pt;
+  font-size: 19pt;
+  line-height: 23pt;
+  font-weight: 700;
+}}
+.header p {{
+  margin: 0;
+  font-size: 9pt;
+  line-height: 11pt;
+}}
+.toc-list {{ margin: 0; padding: 0; }}
+.toc-row {{
+  height: 21pt;
+  page-break-inside: avoid;
   display: flex;
   align-items: center;
-  height: 100%;
-  color: #222;
-  text-decoration: none;
   direction: rtl;
 }}
-.toc-title {{ white-space: nowrap; }}
+.toc-title {{
+  flex: 0 1 auto;
+  white-space: nowrap;
+  direction: rtl;
+  unicode-bidi: isolate;
+}}
 .toc-dots {{
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 10pt;
   border-bottom: 1px dotted #888;
   margin: 0 8pt 3pt;
 }}
 .toc-page {{
+  flex: 0 0 28pt;
   direction: ltr;
   unicode-bidi: isolate;
-  min-width: 27pt;
   text-align: left;
 }}
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>فهرست مطالب</h1>
-  <p>هوش مصنوعی: یک رویکرد مدرن — ویرایش چهارم</p>
+  <h1 dir="rtl">فهرست مطالب</h1>
+  <p dir="rtl">هوش مصنوعی: یک رویکرد مدرن — ویرایش چهارم</p>
 </div>
 <div class="toc-list">{''.join(rows)}</div>
 </body>
@@ -215,20 +255,23 @@ body {{
 
     HTML(string=html, base_url=str(ROOT)).write_pdf(str(output))
     pages = len(PdfReader(str(output)).pages)
+    if pages <= 0:
+        raise RuntimeError("TOC PDF is empty")
 
-    # Rows are fixed-height and start at a known CSS position. Convert the
-    # top-based HTML coordinates into PDF bottom-based coordinates.
-    page_height = A4[1]
+    # The CSS above intentionally uses fixed dimensions. This makes the
+    # annotation rectangles deterministic and keeps them aligned with rows.
+    page_width, page_height = A4
+    margin_left = 17 * 72 / 25.4
     margin_top = 15 * 72 / 25.4
-    header_height = 19 * 1.2 + 5 + 9 * 1.2 + 7
-    # WeasyPrint uses CSS points (1/72 inch), matching PDF points here.
+    header_height = 58.0
+    row_h = 21.0
     first_row_top = page_height - margin_top - header_height
-    row_h = 22.1
+
     rectangles = []
     for index, _entry in enumerate(entries):
         top = first_row_top - index * row_h
         bottom = top - row_h
-        rectangles.append((0, 17 * 72 / 25.4, bottom, A4[0] - 17 * 72 / 25.4, top))
+        rectangles.append((0, margin_left, bottom, page_width - margin_left, top))
 
     return pages, rectangles
 
