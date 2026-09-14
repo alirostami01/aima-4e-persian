@@ -2,18 +2,14 @@
 # -*- coding: utf-8 -*-
 """Build the complete AIMA Persian book PDF from the chapter HTML files.
 
-Pipeline:
-    html/*.html -> clean per-chapter PDFs -> TOC PDF -> merged PDF
-    -> global page numbers -> clickable TOC -> PDF bookmarks
-
-The original HTML/CSS files are never modified.  Run this script again any
- time the HTML changes; the PDF is rebuilt from scratch.
+The source HTML files are never modified. Each chapter is rendered with its
+own CSS, then all chapter PDFs are merged behind a generated TOC. The final
+PDF receives global page numbers, clickable TOC links and PDF bookmarks.
 """
 
 from __future__ import annotations
 
 import argparse
-import html as html_lib
 import io
 import re
 import shutil
@@ -22,7 +18,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 from pypdf import PdfReader, PdfWriter
-from pypdf.generic import ArrayObject, DictionaryObject, FloatObject, NameObject, NumberObject, TextStringObject
+from pypdf.generic import ArrayObject, DictionaryObject, FloatObject, NameObject, NumberObject
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -33,129 +29,69 @@ ROOT = Path(__file__).resolve().parent
 HTML_DIR = ROOT / "html"
 PDF_DIR = ROOT / "pdf"
 DEFAULT_OUTPUT = PDF_DIR / "aima-4e-persian.pdf"
-
 CHAPTER_RE = re.compile(r"^(?P<number>\d+)-(?P<title>.+)\.html$")
 
-# Web-only elements which should not appear in the printed book.
 REMOVE_SELECTORS = (
-    ".kicker",
-    "nav.toc",
-    ".footer-nav",
-    ".top-link",
-    ".web-only",
-    ".screen-only",
-    ".print-hidden",
+    ".kicker", "nav.toc", ".footer-nav", ".top-link",
+    ".web-only", ".screen-only", ".print-hidden",
 )
 
 PRINT_CSS = r"""
-@page {
-    size: A4;
-    margin: 18mm 17mm 20mm 17mm;
-}
-
+@page { size: A4; margin: 18mm 17mm 20mm 17mm; }
 html, body {
     print-color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
 }
-
-.pdf-chapter-title {
-    display: none;
-}
-
 @media print {
-    .kicker,
-    nav.toc,
-    .footer-nav,
-    .top-link,
-    .web-only,
-    .screen-only,
-    .print-hidden {
-        display: none !important;
-    }
-
-    .page,
-    main,
-    article {
-        break-before: auto;
-    }
-
+    .kicker, nav.toc, .footer-nav, .top-link,
+    .web-only, .screen-only, .print-hidden { display: none !important; }
     .box, .tip, .warn, .ok, .formula, .note, .quote, .ex,
-    .summary-box, figure, pre, table {
-        break-inside: avoid;
-        page-break-inside: avoid;
+    .summary-box, figure, pre, table, tr, img {
+        break-inside: avoid; page-break-inside: avoid;
     }
-
-    thead {
-        display: table-header-group;
-    }
-
-    tr, img {
-        break-inside: avoid;
-        page-break-inside: avoid;
-    }
-
-    p, li {
-        orphans: 3;
-        widows: 3;
-    }
+    thead { display: table-header-group; }
+    p, li { orphans: 3; widows: 3; }
 }
 """
 
 
 def discover_chapters() -> list[tuple[int, Path]]:
-    chapters: list[tuple[int, Path]] = []
+    chapters = []
     for path in HTML_DIR.glob("*.html"):
-        match = CHAPTER_RE.match(path.name)
-        if match:
-            chapters.append((int(match.group("number")), path))
-
-    chapters.sort(key=lambda item: item[0])
+        m = CHAPTER_RE.match(path.name)
+        if m:
+            chapters.append((int(m.group("number")), path))
+    chapters.sort(key=lambda x: x[0])
     expected = list(range(29))
-    actual = [number for number, _ in chapters]
+    actual = [n for n, _ in chapters]
     if actual != expected:
-        raise SystemExit(
-            "Chapter validation failed. Expected chapters 00..28, "
-            f"but found: {actual}"
-        )
+        raise SystemExit(f"Chapter validation failed. Expected 00..28, found: {actual}")
     return chapters
 
 
 def chapter_title(path: Path) -> str:
     soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
-    subtitle = soup.select_one(".subtitle")
-    if subtitle:
-        title = subtitle.get_text(" ", strip=True)
-        if title:
-            return title
-    if soup.title:
-        title = soup.title.get_text(" ", strip=True)
-        if title:
-            return title
-    match = CHAPTER_RE.match(path.name)
-    return match.group("title") if match else path.stem
+    node = soup.select_one(".subtitle") or soup.title
+    if node:
+        text = node.get_text(" ", strip=True)
+        if text:
+            return text
+    m = CHAPTER_RE.match(path.name)
+    return m.group("title") if m else path.stem
 
 
 def clean_html(path: Path) -> str:
-    """Return a cleaned copy of one HTML document, preserving its CSS/layout."""
     soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
-
     for selector in REMOVE_SELECTORS:
         for node in soup.select(selector):
             node.decompose()
 
-    # Remove the generated website footer by its distinctive Persian text.
     for node in list(soup.find_all(string=True)):
         text = str(node)
-        if (
-            "این صفحه از ترجمهٔ فارسی فصل‌های کتاب" in text
-            and "راسل" in text
-            and "نورویگ" in text
-        ):
-            parent = node.parent
-            if parent:
-                parent.decompose()
+        if "این صفحه از ترجمهٔ فارسی فصل‌های کتاب" in text and "راسل" in text and "نورویگ" in text:
+            if node.parent:
+                node.parent.decompose()
 
-    # Keep visible link text but remove local file:// navigation URLs.
     for anchor in soup.find_all("a"):
         href = anchor.get("href", "")
         if isinstance(href, str) and href.startswith("file://"):
@@ -168,160 +104,119 @@ def clean_html(path: Path) -> str:
     style.string = PRINT_CSS
     if soup.head:
         soup.head.append(style)
-    else:
+    elif soup.html:
         head = soup.new_tag("head")
         head.append(style)
-        if soup.html:
-            soup.html.insert(0, head)
-
+        soup.html.insert(0, head)
     return str(soup)
 
 
-def render_chapters(chapters: list[tuple[int, Path]], temp_dir: Path) -> list[tuple[int, str, Path, int]]:
+def render_chapters(chapters: list[tuple[int, Path]], temp_dir: Path):
     rendered = []
     for index, (number, path) in enumerate(chapters, 1):
-        title = chapter_title(path)
-        output = temp_dir / f"chapter-{number:02d}.pdf"
         print(f"[{index:02d}/{len(chapters):02d}] {path.name}")
-
-        cleaned = clean_html(path)
-        HTML(string=cleaned, base_url=str(path.parent)).write_pdf(str(output))
-
-        reader = PdfReader(str(output))
-        pages = len(reader.pages)
+        output = temp_dir / f"chapter-{number:02d}.pdf"
+        HTML(string=clean_html(path), base_url=str(path.parent)).write_pdf(str(output))
+        pages = len(PdfReader(str(output)).pages)
         if pages <= 0:
-            raise RuntimeError(f"Chapter {number:02d} produced an empty PDF: {path}")
-
+            raise RuntimeError(f"Chapter {number:02d} produced an empty PDF")
         print(f"       → {pages} pages")
-        rendered.append((number, title, output, pages))
+        rendered.append((number, chapter_title(path), output, pages))
     return rendered
 
 
 def find_font() -> str | None:
-    candidates = [
+    for candidate in (
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
         "/usr/share/fonts/opentype/noto/NotoSansArabic-Regular.ttf",
-    ]
-    for candidate in candidates:
+    ):
         if Path(candidate).exists():
             return candidate
     return None
 
 
-def make_toc_pdf(entries: list[tuple[int, str, int]], output: Path, font_path: str | None) -> tuple[int, list[tuple[int, float, float, float, float]]]:
-    """Create TOC and return (page_count, clickable row rectangles).
-
-    Rectangles are returned in PDF coordinates as (page, x1, y1, x2, y2),
-    ready for link annotations after the final book has been merged.
-    """
+def make_toc_pdf(entries: list[tuple[int, str, int]], output: Path, font_path: str | None):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    font_name = "Helvetica"
+    font = "Helvetica"
     if font_path:
         try:
-            font_name = "AIMAPersian"
-            pdfmetrics.registerFont(TTFont(font_name, font_path))
+            pdfmetrics.registerFont(TTFont("AIMAPersian", font_path))
+            font = "AIMAPersian"
         except Exception:
-            font_name = "Helvetica"
+            pass
 
     c.setTitle("هوش مصنوعی: رویکردی نوین — فهرست مطالب")
-    c.setAuthor("ترجمهٔ فارسی — علی رستمی")
-
-    # A compact professional TOC designed to fit the 29 entries on one page.
-    c.setFont(font_name, 20)
+    c.setAuthor("علی رستمی")
+    c.setFont(font, 20)
     c.drawRightString(width - 48, height - 58, "فهرست مطالب")
-
-    c.setFont(font_name, 9)
+    c.setFont(font, 9)
     c.drawRightString(width - 48, height - 78, "هوش مصنوعی: یک رویکرد مدرن — ویرایش چهارم")
 
     y = height - 112
     row_h = 23
-    rectangles: list[tuple[int, float, float, float, float]] = []
+    rectangles = []
+    page_no = 0
 
     for number, title, page_number in entries:
         if y < 60:
             c.showPage()
+            page_no += 1
             y = height - 55
-
-        x_right = width - 48
-        x_left = 52
-        page_x = 52
-        text_x = width - 78
-
-        c.setFont(font_name, 10.5)
+        x_left, x_right = 52, width - 48
+        page_x, text_x = 52, width - 78
+        c.setFont(font, 10.5)
         label = f"{number:02d}. {title}"
-        # Escape unsupported glyphs only when Helvetica fallback is used.
-        if font_name == "Helvetica":
+        if font == "Helvetica":
             label = f"{number:02d}. {title.encode('ascii', 'replace').decode()}"
-
-        # Dotted leader.
         c.drawRightString(text_x, y, label)
         c.drawString(page_x, y, str(page_number))
         c.setDash(1, 2)
         c.line(page_x + 22, y + 2, text_x - 8, y + 2)
         c.setDash()
-
-        # Rectangle covering the visible row; destination is added after merge.
-        rectangles.append((len(rectangles) and 0 or 0, x_left, y - 5, x_right, y + 10))
+        rectangles.append((page_no, x_left, y - 5, x_right, y + 10))
         y -= row_h
 
     c.save()
-    buffer.seek(0)
-
-    # Persist the generated PDF and count its pages.
-    output.write_bytes(buffer.read())
+    output.write_bytes(buffer.getvalue())
     pages = len(PdfReader(str(output)).pages)
-
-    # All rows currently start on TOC page 0 unless pagination occurs.
-    # Reconstruct accurate page indices by row position if needed.
-    if pages == 1:
-        rectangles = [(0, x1, y1, x2, y2) for _, x1, y1, x2, y2 in rectangles]
-    else:
-        # Current layout should fit one page; keep a safe fallback.
-        rectangles = [(0, x1, y1, x2, y2) for _, x1, y1, x2, y2 in rectangles]
-
     return pages, rectangles
 
 
-def add_link_annotation(page, rect: tuple[float, float, float, float], target_page_index: int) -> None:
-    """Add a PDF internal link annotation to a page in a PdfWriter."""
-    x1, y1, x2, y2 = rect
-    annotation = DictionaryObject()
-    annotation[NameObject("/Type")] = NameObject("/Annot")
-    annotation[NameObject("/Subtype")] = NameObject("/Link")
-    annotation[NameObject("/Rect")] = ArrayObject([
-        FloatObject(x1), FloatObject(y1), FloatObject(x2), FloatObject(y2)
-    ])
-    annotation[NameObject("/Border")] = ArrayObject([NumberObject(0), NumberObject(0), NumberObject(0)])
-    annotation[NameObject("/Dest")] = ArrayObject([
-        page_ref := target_page_index,
-    ])
-
-    # pypdf expects a page indirect reference in /Dest. The caller replaces
-    # this placeholder with a real reference immediately after adding it.
-    page[NameObject("/Annots")] = page.get("/Annots", ArrayObject())
-    page[NameObject("/Annots")].append(annotation)
-
-
-def add_global_page_numbers(writer: PdfWriter, start_page: int = 1) -> None:
-    """Overlay a centered global page number on every page."""
-    from reportlab.lib.colors import black
-
-    total = len(writer.pages)
-    for index, page in enumerate(writer.pages):
-        number = start_page + index
+def add_global_page_numbers(writer: PdfWriter) -> None:
+    for index, page in enumerate(writer.pages, 1):
         packet = io.BytesIO()
         c = canvas.Canvas(packet, pagesize=A4)
-        c.setFillColor(black)
         c.setFont("Helvetica", 8.5)
-        c.drawCentredString(A4[0] / 2, 18, str(number))
+        c.drawCentredString(A4[0] / 2, 18, str(index))
         c.save()
         packet.seek(0)
-        overlay = PdfReader(packet).pages[0]
-        page.merge_page(overlay)
+        page.merge_page(PdfReader(packet).pages[0])
+
+
+def add_internal_link(page, rect, target_page):
+    x1, y1, x2, y2 = rect
+    annotation = DictionaryObject({
+        NameObject("/Type"): NameObject("/Annot"),
+        NameObject("/Subtype"): NameObject("/Link"),
+        NameObject("/Rect"): ArrayObject([
+            FloatObject(x1), FloatObject(y1), FloatObject(x2), FloatObject(y2)
+        ]),
+        NameObject("/Border"): ArrayObject([
+            NumberObject(0), NumberObject(0), NumberObject(0)
+        ]),
+        NameObject("/Dest"): ArrayObject([
+            target_page.indirect_reference, NameObject("/Fit")
+        ]),
+    })
+    annots = page.get("/Annots")
+    if annots is None:
+        annots = ArrayObject()
+        page[NameObject("/Annots")] = annots
+    annots.append(annotation)
 
 
 def build(output: Path, keep_chapters: bool = False) -> None:
@@ -331,92 +226,72 @@ def build(output: Path, keep_chapters: bool = False) -> None:
     with tempfile.TemporaryDirectory(prefix="aima-pdf-") as temp_name:
         temp_dir = Path(temp_name)
         rendered = render_chapters(chapters, temp_dir)
-
-        # The TOC is one page in the normal 29-chapter layout. We still use an
-        # iterative calculation so page references remain correct if the TOC
-        # ever grows to multiple pages.
-        toc_pages = 1
         toc_path = temp_dir / "toc.pdf"
         font_path = find_font()
 
-        for _ in range(3):
-            page_cursor = toc_pages + 1  # first chapter is page 2 if TOC=1
+        toc_pages = 1
+        for _ in range(5):
+            cursor = toc_pages + 1
             entries = []
-            for number, title, _, pages in rendered:
-                entries.append((number, title, page_cursor))
-                page_cursor += pages
-
-            new_toc_pages, toc_rects = make_toc_pdf(entries, toc_path, font_path)
-            if new_toc_pages == toc_pages:
+            for number, title, _pdf, pages in rendered:
+                entries.append((number, title, cursor))
+                cursor += pages
+            new_pages, _ = make_toc_pdf(entries, toc_path, font_path)
+            if new_pages == toc_pages:
                 break
-            toc_pages = new_toc_pages
+            toc_pages = new_pages
         else:
-            raise RuntimeError("TOC page-count did not stabilize after 3 iterations")
+            raise RuntimeError("TOC page count did not stabilize")
 
-        # Rebuild entries once more using the final TOC page count.
-        page_cursor = toc_pages + 1
+        # Final TOC generation. The previous implementation compared the TOC
+        # page count against a zero-based chapter index, causing a false
+        # off-by-one RuntimeError even when the TOC was perfectly valid.
+        cursor = toc_pages + 1
         entries = []
-        chapter_start_pages: list[tuple[int, int]] = []
-        for number, title, _, pages in rendered:
-            entries.append((number, title, page_cursor))
-            chapter_start_pages.append((number, page_cursor - 1))  # zero-based index
-            page_cursor += pages
+        for number, title, _pdf, pages in rendered:
+            entries.append((number, title, cursor))
+            cursor += pages
+        final_toc_pages, toc_rects = make_toc_pdf(entries, toc_path, font_path)
 
-        toc_pages, toc_rects = make_toc_pdf(entries, toc_path, font_path)
-        if toc_pages != (chapter_start_pages[0][1] + 1):
-            # This condition is intentionally conservative; regenerate if the
-            # TOC unexpectedly changed size.
-            raise RuntimeError("TOC page count changed unexpectedly during final generation")
+        if final_toc_pages != toc_pages:
+            toc_pages = final_toc_pages
+            cursor = toc_pages + 1
+            entries = []
+            for number, title, _pdf, pages in rendered:
+                entries.append((number, title, cursor))
+                cursor += pages
+            final_toc_pages, toc_rects = make_toc_pdf(entries, toc_path, font_path)
+            if final_toc_pages != toc_pages:
+                raise RuntimeError("TOC page count did not stabilize during final generation")
 
         writer = PdfWriter()
-        toc_reader = PdfReader(str(toc_path))
-        for page in toc_reader.pages:
+        for page in PdfReader(str(toc_path)).pages:
             writer.add_page(page)
 
-        chapter_page_refs: dict[int, object] = {}
-        chapter_zero_indices: dict[int, int] = {}
+        chapter_indices = {}
         current_index = toc_pages
-
-        for number, title, chapter_pdf, _ in rendered:
-            reader = PdfReader(str(chapter_pdf))
-            chapter_zero_indices[number] = current_index
-            for page in reader.pages:
+        for number, title, chapter_pdf, _pages in rendered:
+            chapter_indices[number] = current_index
+            for page in PdfReader(str(chapter_pdf)).pages:
                 writer.add_page(page)
                 current_index += 1
 
-        # PDF bookmarks / outline.
         writer.add_outline_item("فهرست مطالب", 0)
-        for number, title, _chapter_pdf, _pages in rendered:
-            writer.add_outline_item(f"{number:02d}. {title}", chapter_zero_indices[number])
+        for number, title, _pdf, _pages in rendered:
+            writer.add_outline_item(f"{number:02d}. {title}", chapter_indices[number])
 
-        # Clickable TOC rows. We create /Dest annotations with actual page
-        # references now that all pages have been added.
-        toc_page = writer.pages[0]
         for row_index, (number, _title, _page_number) in enumerate(entries):
             if row_index >= len(toc_rects):
                 break
-            _, x1, y1, x2, y2 = toc_rects[row_index]
-            target_index = chapter_zero_indices[number]
-            annotation = DictionaryObject()
-            annotation[NameObject("/Type")] = NameObject("/Annot")
-            annotation[NameObject("/Subtype")] = NameObject("/Link")
-            annotation[NameObject("/Rect")] = ArrayObject([
-                FloatObject(x1), FloatObject(y1), FloatObject(x2), FloatObject(y2)
-            ])
-            annotation[NameObject("/Border")] = ArrayObject([
-                NumberObject(0), NumberObject(0), NumberObject(0)
-            ])
-            annotation[NameObject("/Dest")] = ArrayObject([
-                writer.pages[target_index].indirect_reference,
-                NameObject("/Fit"),
-            ])
-            annots = toc_page.get("/Annots")
-            if annots is None:
-                annots = ArrayObject()
-                toc_page[NameObject("/Annots")] = annots
-            annots.append(annotation)
+            toc_page_no, x1, y1, x2, y2 = toc_rects[row_index]
+            if toc_page_no >= toc_pages:
+                continue
+            add_internal_link(
+                writer.pages[toc_page_no],
+                (x1, y1, x2, y2),
+                writer.pages[chapter_indices[number]],
+            )
 
-        # Metadata.
         writer.add_metadata({
             "/Title": "هوش مصنوعی: رویکردی نوین — ویرایش چهارم",
             "/Author": "علی رستمی",
@@ -424,7 +299,6 @@ def build(output: Path, keep_chapters: bool = False) -> None:
             "/Creator": "build_pdf.py",
         })
 
-        # Global page numbers are added after TOC + all chapters have been merged.
         add_global_page_numbers(writer)
 
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -438,13 +312,10 @@ def build(output: Path, keep_chapters: bool = False) -> None:
                 shutil.copy2(chapter_pdf, chapter_dir / f"{number:02d}.pdf")
 
         final_reader = PdfReader(str(output))
-        total_pages = len(final_reader.pages)
-        size_mb = output.stat().st_size / (1024 * 1024)
-
         print("\nPDF successfully created")
         print(f"Output : {output}")
-        print(f"Pages  : {total_pages}")
-        print(f"Size   : {size_mb:.2f} MB")
+        print(f"Pages  : {len(final_reader.pages)}")
+        print(f"Size   : {output.stat().st_size / (1024 * 1024):.2f} MB")
         print("TOC    : clickable + page numbers")
         print("Outline: chapter bookmarks")
 
@@ -452,11 +323,7 @@ def build(output: Path, keep_chapters: bool = False) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build the complete AIMA Persian PDF")
     parser.add_argument("-o", "--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument(
-        "--keep-chapters",
-        action="store_true",
-        help="also keep individual chapter PDFs in pdf/chapters/",
-    )
+    parser.add_argument("--keep-chapters", action="store_true")
     args = parser.parse_args()
     build(args.output.resolve(), args.keep_chapters)
 
