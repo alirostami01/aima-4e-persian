@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Build the complete AIMA Persian book PDF from the chapter HTML files.
-
-The source HTML files are never modified. Each chapter is rendered with its
-own CSS, then all chapter PDFs are merged behind a generated TOC. The final
-PDF receives global page numbers, clickable TOC links and PDF bookmarks.
-"""
+"""Build the complete AIMA Persian book PDF from the chapter HTML files."""
 
 from __future__ import annotations
 
@@ -20,8 +15,6 @@ from bs4 import BeautifulSoup
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import ArrayObject, DictionaryObject, FloatObject, NameObject, NumberObject
 from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from weasyprint import HTML
 
@@ -127,9 +120,10 @@ def render_chapters(chapters: list[tuple[int, Path]], temp_dir: Path):
 
 def find_font() -> str | None:
     for candidate in (
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
         "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
         "/usr/share/fonts/opentype/noto/NotoSansArabic-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ):
         if Path(candidate).exists():
             return candidate
@@ -137,53 +131,115 @@ def find_font() -> str | None:
 
 
 def make_toc_pdf(entries: list[tuple[int, str, int]], output: Path, font_path: str | None):
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+    """Render the TOC with WeasyPrint so Persian shaping and RTL are correct.
 
-    font = "Helvetica"
-    if font_path:
-        try:
-            pdfmetrics.registerFont(TTFont("AIMAPersian", font_path))
-            font = "AIMAPersian"
-        except Exception:
-            pass
+    Returns (page_count, clickable row rectangles). Rectangles are PDF points
+    measured from the bottom-left, one tuple per TOC entry.
+    """
+    if not font_path:
+        raise RuntimeError(
+            "No Unicode font was found for the Persian TOC. Install Noto Sans "
+            "or DejaVu Sans and run the build again."
+        )
 
-    c.setTitle("هوش مصنوعی: رویکردی نوین — فهرست مطالب")
-    c.setAuthor("علی رستمی")
-    c.setFont(font, 20)
-    c.drawRightString(width - 48, height - 58, "فهرست مطالب")
-    c.setFont(font, 9)
-    c.drawRightString(width - 48, height - 78, "هوش مصنوعی: یک رویکرد مدرن — ویرایش چهارم")
-
-    y = height - 112
-    row_h = 23
-    rectangles = []
-    page_no = 0
-
+    # Keep the TOC deliberately compact so all 29 chapters normally fit on one
+    # page. The layout is fixed enough that the clickable row rectangles can be
+    # mapped reliably into the merged PDF afterwards.
+    rows = []
     for number, title, page_number in entries:
-        if y < 60:
-            c.showPage()
-            page_no += 1
-            y = height - 55
-        x_left, x_right = 52, width - 48
-        page_x, text_x = 52, width - 78
-        c.setFont(font, 10.5)
-        label = f"{number:02d}. {title}"
-        if font == "Helvetica":
-            label = f"{number:02d}. {title.encode('ascii', 'replace').decode()}"
-        c.drawRightString(text_x, y, label)
-        c.drawString(page_x, y, str(page_number))
-        c.setDash(1, 2)
-        c.line(page_x + 22, y + 2, text_x - 8, y + 2)
-        c.setDash()
-        rectangles.append((page_no, x_left, y - 5, x_right, y + 10))
-        y -= row_h
+        rows.append(
+            f'<div class="toc-row" data-number="{number:02d}">'
+            f'<a href="#chapter-{number:02d}">'
+            f'<span class="toc-title">{number:02d}. {escape_html(title)}</span>'
+            f'<span class="toc-dots"></span>'
+            f'<span class="toc-page">{page_number}</span>'
+            f'</a></div>'
+        )
 
-    c.save()
-    output.write_bytes(buffer.getvalue())
+    font_face = Path(font_path).as_uri()
+    html = f"""<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<style>
+@font-face {{
+  font-family: AIMA-Persian;
+  src: url('{font_face}');
+  font-weight: 400;
+}}
+@page {{ size: A4; margin: 15mm 17mm 16mm 17mm; }}
+* {{ box-sizing: border-box; }}
+html, body {{ margin: 0; padding: 0; direction: rtl; }}
+body {{
+  font-family: AIMA-Persian, sans-serif;
+  font-size: 10.2pt;
+  line-height: 1.2;
+  direction: rtl;
+  color: #222;
+}}
+.header {{ text-align: center; margin: 0 0 12pt; }}
+.header h1 {{ margin: 0 0 5pt; font-size: 19pt; font-weight: 700; }}
+.header p {{ margin: 0; font-size: 9pt; }}
+.toc-list {{ margin-top: 7pt; }}
+.toc-row {{ height: 22.1pt; page-break-inside: avoid; }}
+.toc-row a {{
+  display: flex;
+  align-items: center;
+  height: 100%;
+  color: #222;
+  text-decoration: none;
+  direction: rtl;
+}}
+.toc-title {{ white-space: nowrap; }}
+.toc-dots {{
+  flex: 1;
+  border-bottom: 1px dotted #888;
+  margin: 0 8pt 3pt;
+}}
+.toc-page {{
+  direction: ltr;
+  unicode-bidi: isolate;
+  min-width: 27pt;
+  text-align: left;
+}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>فهرست مطالب</h1>
+  <p>هوش مصنوعی: یک رویکرد مدرن — ویرایش چهارم</p>
+</div>
+<div class="toc-list">{''.join(rows)}</div>
+</body>
+</html>"""
+
+    HTML(string=html, base_url=str(ROOT)).write_pdf(str(output))
     pages = len(PdfReader(str(output)).pages)
+
+    # Rows are fixed-height and start at a known CSS position. Convert the
+    # top-based HTML coordinates into PDF bottom-based coordinates.
+    page_height = A4[1]
+    margin_top = 15 * 72 / 25.4
+    header_height = 19 * 1.2 + 5 + 9 * 1.2 + 7
+    # WeasyPrint uses CSS points (1/72 inch), matching PDF points here.
+    first_row_top = page_height - margin_top - header_height
+    row_h = 22.1
+    rectangles = []
+    for index, _entry in enumerate(entries):
+        top = first_row_top - index * row_h
+        bottom = top - row_h
+        rectangles.append((0, 17 * 72 / 25.4, bottom, A4[0] - 17 * 72 / 25.4, top))
+
     return pages, rectangles
+
+
+def escape_html(text: str) -> str:
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
 
 
 def add_global_page_numbers(writer: PdfWriter) -> None:
@@ -243,9 +299,6 @@ def build(output: Path, keep_chapters: bool = False) -> None:
         else:
             raise RuntimeError("TOC page count did not stabilize")
 
-        # Final TOC generation. The previous implementation compared the TOC
-        # page count against a zero-based chapter index, causing a false
-        # off-by-one RuntimeError even when the TOC was perfectly valid.
         cursor = toc_pages + 1
         entries = []
         for number, title, _pdf, pages in rendered:
