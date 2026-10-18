@@ -120,7 +120,90 @@
   .footer-nav { margin-top: 36px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
   .footer-nav a { color: var(--teal); font-weight: 700; text-decoration: none; }
   .footer-nav a:hover { color: var(--wine); text-decoration: underline; }
-  .top-link { display: inline-block; margin-top: 6px; color: var(--muted); text-decoration: none; font-size: 14px; }
+  .trial-box {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    box-shadow: var(--shadow);
+  }
+  .trial-row {
+    margin: 10px 0;
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    overflow-x: auto;
+    white-space: nowrap;
+    direction: ltr;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .trial-num {
+    font-weight: 700;
+    color: var(--wine);
+    margin-right: 8px;
+    font-size: 14px;
+    direction: rtl;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .state {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--navy);
+    padding: 3px 6px;
+    background: #eef3f8;
+    border-radius: 6px;
+    border: 1px solid #d5e0ee;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .state.goal {
+    background: var(--ok-soft);
+    color: var(--ok);
+    border-color: #b7dec8;
+  }
+  .state.pit {
+    background: var(--bad-soft);
+    color: var(--bad);
+    border-color: #f0b8ba;
+  }
+  .trans {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 4px;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+  .trans .reward {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--wine);
+  }
+  .trans .reward.win {
+    color: var(--ok);
+  }
+  .trans .reward.loss {
+    color: var(--bad);
+  }
+  .trans .arrow {
+    font-size: 18px;
+    line-height: 1;
+    color: var(--navy);
+  }
+  .trans .action {
+    font-size: 11px;
+    line-height: 1.1;
+    color: var(--teal);
+    font-family: Tahoma, sans-serif;
+  }
 </style>
 </head>
 <body>
@@ -173,9 +256,60 @@
 <p>عامل می‌کوشد تابعِ مطلوبیتِ U^π(s)—مجموعِ موردانتظارِ کلِ پاداشِ تخفیف‌خورده اگر سیاستِ π از حالتِ s آغاز شود—را یاد بگیرد. این را «عاملِ یادگیریِ منفعل» (Passive Learning Agent) می‌نامیم.</p>
 <p>تکلیفِ یادگیریِ منفعل شبیهِ تکلیفِ ارزیابیِ سیاست است، بخشی از الگوریتمِ تکرارِ سیاستِ توصیف‌شده در بخش ۱۷.۲.۲. تفاوت این است که عاملِ یادگیریِ منفعل مدلِ انتقالِ <span class="en-inline">P(s′|s,a)</span> را نمی‌داند، که احتمالِ رسیدن به حالتِ s′ از حالتِ s پس از انجامِ کنشِ a را مشخص می‌کند؛ و تابعِ پاداشِ <span class="en-inline">R(s,a,s′)</span> را نیز نمی‌داند، که پاداشِ هر انتقال را مشخص می‌کند.</p>
 <p>به‌عنوانِ مثال از جهانِ ۴×۳ِ معرفی‌شده در فصل ۱۷ استفاده می‌کنیم. شکل ۲۲.۱ سیاست‌های بهینه را برای آن جهان و مطلوبیت‌های متناظر را نشان می‌دهد. عامل با استفاده از سیاستِ π مجموعه‌ای از «کوشش»ها (Trial) را در محیط اجرا می‌کند. در هر کوشش، عامل از حالتِ (1,1) شروع می‌کند و دنباله‌ای از انتقالِ حالت را تجربه می‌کند تا به یکی از حالت‌های پایانی، (4,2) یا (4,3)، برسد. ادراک‌هایش هم حالتِ کنونی و هم پاداشِ دریافتی برای انتقالی که تازه برای رسیدن به آن حالت رخ داده فراهم می‌کنند. کوشش‌های معمولی ممکن است چنین باشند:</p>
-<p>(1,1) −0.04 → بالا (1,2) −0.04 → بالا (1,3) −0.04 → راست (1,2) −0.04 → بالا (1,3) −0.04 → راست (2,3) −0.04 → راست (3,3) +1 → راست (4,3)</p>
-<p>(1,1) −0.04 → بالا (1,2) −0.04 → بالا (1,3) −0.04 → راست (2,3) −0.04 → راست (3,3) −0.04 → راست (3,2) −0.04 → بالا (3,3) +1 → راست (4,3)</p>
-<p>(1,1) −0.04 → بالا (1,2) −0.04 → بالا (1,3) −0.04 → راست (2,3) −0.04 → راست (3,3) −0.04 → راست (3,2) −1 → بالا (4,2)</p>
+<div class="trial-box">
+  <div class="trial-row">
+    <span class="trial-num">کوشش ۱:</span>
+    <span class="state">(1,1)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">بالا</span></span>
+    <span class="state">(1,2)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">بالا</span></span>
+    <span class="state">(1,3)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state">(1,2)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">بالا</span></span>
+    <span class="state">(1,3)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state">(2,3)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state">(3,3)</span>
+    <span class="trans"><span class="reward win">+1</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state goal">(4,3)</span>
+  </div>
+  <div class="trial-row">
+    <span class="trial-num">کوشش ۲:</span>
+    <span class="state">(1,1)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">بالا</span></span>
+    <span class="state">(1,2)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">بالا</span></span>
+    <span class="state">(1,3)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state">(2,3)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state">(3,3)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state">(3,2)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">بالا</span></span>
+    <span class="state">(3,3)</span>
+    <span class="trans"><span class="reward win">+1</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state goal">(4,3)</span>
+  </div>
+  <div class="trial-row">
+    <span class="trial-num">کوشش ۳:</span>
+    <span class="state">(1,1)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">بالا</span></span>
+    <span class="state">(1,2)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">بالا</span></span>
+    <span class="state">(1,3)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state">(2,3)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state">(3,3)</span>
+    <span class="trans"><span class="reward">−0.04</span><span class="arrow">→</span><span class="action">راست</span></span>
+    <span class="state">(3,2)</span>
+    <span class="trans"><span class="reward loss">−1</span><span class="arrow">→</span><span class="action">بالا</span></span>
+    <span class="state pit">(4,2)</span>
+  </div>
+</div>
 <p>توجه کنید هر انتقال هم با کنشِ انجام‌شده و هم با پاداشِ دریافتی در حالتِ بعدی حاشیه‌نویسی شده. هدف استفاده از اطلاعاتِ مربوط به پاداش‌ها برای یادگیریِ مطلوبیتِ موردانتظارِ U^π(s) وابسته به هر حالتِ غیرپایانیِ s است. مطلوبیت به‌عنوانِ مجموعِ موردانتظارِ پاداش‌های (تخفیف‌خورده) ای که اگر سیاستِ π دنبال شود به‌دست می‌آید تعریف می‌شود. چنان‌که در معادلهٔ (17.2) در صفحهٔ ۵۶۷، می‌نویسیم:</p>
 <pre class="code"><code>U^π(s) = E[∑_{t=0}^{∞} γᵗ R(Sₜ, π(Sₜ), Sₜ₊₁)]        (22.1)</code></pre>
 <p>که در آن R(Sₜ, π(Sₜ), Sₜ₊₁) پاداشِ دریافتی است وقتی کنشِ π(Sₜ) در حالتِ Sₜ گرفته می‌شود و به حالتِ Sₜ₊₁ می‌رسد. توجه کنید Sₜ متغیرِ تصادفی است که حالتی را نشان می‌دهد در زمانِ t هنگامِ اجرایِ سیاستِ π، با شروع از حالتِ S₀ = s، به آن می‌رسیم. عاملِ تخفیفِ γ را در همهٔ معادله‌هایمان می‌گنجانیم، اما برای جهانِ ۴×۳ مقدارِ γ = 1 می‌گذاریم، که یعنی بدونِ تخفیف.</p>
@@ -189,23 +323,7 @@
 <p>جایگزین، می‌توانیم رویکردِ تکرارِ سیاستِ اصلاح‌شده را برگزینیم (صفحهٔ ۵۷۸ را ببینید)، با استفاده از فرایندِ ساده‌شدهٔ تکرارِ ارزش برای به‌روزرسانیِ برآوردهای مطلوبیت پس از هر تغییرِ مدلِ آموخته‌شده. چون مدل معمولاً با هر مشاهده فقط کمی تغییر می‌کند، فرایندِ تکرارِ ارزش می‌تواند از برآوردهای مطلوبیتِ قبلی به‌عنوانِ مقادیرِ اولیه استفاده کند و معمولاً خیلی سریع همگرا می‌شود. یادگیریِ مدلِ انتقال آسان است، زیرا محیط کاملاً مشاهده‌پذیر است. این بدان‌معناست که تکلیفِ یادگیریِ نظارت‌شده‌ای داریم که ورودیِ هر مثالِ آموزشی جفتِ حالت-کنشِ (s,a) و خروجی حالتِ حاصل، s′، است. مدلِ انتقالِ <span class="en-inline">P(s′|s,a)</span> به‌صورتِ جدولی بازنمایی و مستقیماً از شمارش‌های انباشته‌شده در <span class="en-inline">N_{s′|sa</span>} برآورد می‌شود. شمارش‌ها ثبت می‌کنند حالتِ s′ چند بار هنگامِ اجرایِ a در s به‌دست می‌آید. برای نمونه، در سه کوششِ داده‌شده در صفحهٔ ۷۹۲، «راست» چهار بار در (3,3) اجرا می‌شود و حالتِ حاصل دو بار (3,2) و دو بار (4,3) است، پس P((3,2)|(3,3), راست) و P((4,3)|(3,3), راست) هر دو ½ برآورد می‌شوند.</p>
 <p>برنامهٔ کاملِ عاملِ <span class="en-inline">ADP</span>ِ منفعل در شکل ۲۲.۲ نشان داده شده. عملکردش رویِ جهانِ ۴×۳ در شکل ۲۲.۳ نشان داده شده. از نظرِ سرعتی که برآوردهای ارزش‌اش بهبود می‌یابند، عاملِ <span class="en-inline">ADP</span> فقط با توانایی‌اش در یادگیریِ مدلِ انتقال محدود می‌شود. از این نظر، معیاری فراهم می‌کند که هر الگوریتمِ یادگیریِ تقویتیِ دیگری را می‌توان با آن سنجید. اما برای فضاهای حالتِ بزرگ محاسبه‌ناپذیر است. در بازیِ تخته‌نرد، برای نمونه، حلِ تقریباً 10²<sup>⁰</sup> معادله در 10²<sup>⁰</sup> مجهول را دربرمی‌گرفت.</p>
 <figure class="fig"><img src="../figures/ch22/fig-22-2.jpg" alt="شکل 22.2"><figcaption><strong>شکل ۲۲.۲ — عاملِ یادگیریِ تقویتیِ منفعلِ مبتنی بر برنامه‌نویسیِ پویایِ تطبیقی. عامل برای γ مقداری انتخاب می‌کند و سپس مقادیرِ P و Rِ MDP را به‌صورتِ افزایشی محاسبه می‌کند. تابعِ POLICY-EVALUATION معادله‌های بلمنِ سیاست-ثابت را حل می‌کند، چنان‌که در صفحهٔ ۵۷۷ توصیف شده.</strong></figcaption></figure>
-<pre class="code"><code>function PASSIVE-ADP-LEARNER(percept) returns an action
-  inputs: percept, a percept indicating current state s' and reward signal r
-  persistent: π, a fixed policy
-              mdp, an MDP with model P, rewards R, actions A, discount γ
-              U, a table of utilities for states, initially empty
-              N_{s'|s,a}, a table of outcome count vectors, initially zero
-              s, a, previous state and action, initially null
 
-  if s' is new then U[s'] ← 0
-  if s is not null then
-    increment N_{s'|s,a}[s, a][s']
-    R[s, a, s'] ← r
-    add a to A[s]
-    P(· | s, a) ← NORMALIZE(N_{s'|s,a}[s, a])
-    U ← POLICY-EVALUATION(π, U, mdp)
-  s, a ← s', π[s']
-  return a</code></pre>
 <figure class="fig"><img src="../figures/ch22/fig-22-3.jpg" alt="شکل 22.3"><figcaption><strong>شکل ۲۲.۳ — منحنی‌های یادگیریِ ADPِ منفعل برای جهانِ ۴×۳، با توجه به سیاستِ بهینهٔ نشان‌داده‌شده در شکل ۲۲.۱. (الف) برآوردهای مطلوبیت برای زیرمجموعهٔ انتخابی از حالت‌ها، (1,1)، (1,3)، (2,1)، (3,2) و (3,3)، به‌عنوانِ تابعی از تعدادِ کوشش‌ها (محورِ عمودی بازهٔ 0.5 تا 0.9 را می‌پوشاند). توجه کنید به‌ترتیب ۱۴ و ۲۳ کوشش لازم است تا حالت‌های به‌ندرت بازدیدشدهٔ (2,1) و (3,2) «کشف» کنند که به حالتِ خروجیِ +1 در (4,3) متصل‌اند. (ب) ریشهٔ میانگینِ مربعاتِ خطا (پیوستِ الف را ببینید) در برآوردِ U(1,1)، میانگین‌شده رویِ ۵۰ اجرایِ ۱۰۰ کوششی (محورِ عمودی بازهٔ 0.05 تا 0.2 را می‌پوشاند).</strong></figcaption></figure>
 <h3>۲۲.۲.۳ یادگیریِ تفاضلِ زمانی</h3>
 <p>حلِ <span class="en-inline">MDP</span>ِ زیرین مانندِ بخشِ پیشین تنها راهِ به‌کاربردنِ معادله‌های بلمن بر مسئلهٔ یادگیری نیست. راهِ دیگر استفاده از انتقال‌های مشاهده‌شده برای تنظیمِ مطلوبیت‌های حالت‌های مشاهده‌شده است تا با معادله‌های قید موافقت کنند. برای نمونه، انتقال از (1,3) به (2,3) در دومین کوششِ صفحهٔ ۷۹۲ را در نظر بگیرید. فرض کنید در نتیجهٔ کوششِ نخست، برآوردهای مطلوبیت U^π(1,3) = 0.88 و U^π(2,3) = 0.96 باشند. حالا، اگر این انتقال از (1,3) به (2,3) همیشه رخ می‌داد، انتظار داشتیم مطلوبیت‌ها از معادلهٔ U^π(1,3) = −0.04 + U^π(2,3) پیروی کنند، پس U^π(1,3) برابرِ 0.92 می‌شد. پس، برآوردِ کنونیِ 0.84 ممکن است کمی پایین باشد و باید افزایش یابد.</p>
@@ -215,19 +333,6 @@
 <p>همهٔ روش‌های تفاضلِ زمانی با تنظیمِ برآوردهای مطلوبیت به سمتِ تعادلِ ایده‌آلی کار می‌کنند که به‌صورتِ محلی وقتی برآوردهای مطلوبیت درست‌اند برقرار است. در موردِ یادگیریِ منفعل، تعادل توسط معادلهٔ (22.2) داده می‌شود. حالا معادلهٔ (22.3) در واقع باعث می‌شود عامل به تعادلِ داده‌شده توسط معادلهٔ (22.2) برسد، اما ظرافتی در کار است. نخست، توجه کنید به‌روزرسانی فقط جانشینِ مشاهده‌شدهٔ s′ را دربرمی‌گیرد، در حالی که شرایطِ تعادلِ واقعی همهٔ حالت‌های بعدیِ ممکن را دربرمی‌گیرد. ممکن است کسی فکر کند این وقتی انتقالِ بسیار نادری رخ می‌دهد باعث تغییرِ نابه‌جایِ بزرگی در U^π(s) می‌شود؛ اما، در واقع، چون انتقال‌های نادر به‌ندرت رخ می‌دهند، مقدارِ میانگینِ U^π(s) در حد به کمیتِ درست همگرا خواهد شد، حتی اگر خودِ مقدار به نوسان ادامه دهد.</p>
 <p>افزون بر این، اگر پارامترِ α را به تابعی تبدیل کنیم که با افزایشِ تعدادِ دفعاتِ بازدیدِ یک حالت کاهش می‌یابد، چنان‌که در شکل ۲۲.۴ نشان داده شده، آنگاه خودِ U^π(s) به مقدارِ درست همگرا خواهد شد.<sup>³</sup></p>
 <figure class="fig"><img src="../figures/ch22/fig-22-4.jpg" alt="شکل 22.4"><figcaption><strong>شکل ۲۲.۴ — عاملِ یادگیریِ تقویتیِ منفعل که برآوردهای مطلوبیت را با استفاده از تفاضل‌های زمانی یاد می‌گیرد. تابعِ اندازه‌گامِ α(n) چنان انتخاب می‌شود که همگرایی تضمین شود.</strong></figcaption></figure>
-<pre class="code"><code>function PASSIVE-TD-LEARNER(percept) returns an action
-  inputs: percept, a percept indicating current state s' and reward signal r
-  persistent: π, a fixed policy
-              s, previous state, initially null
-              U, a table of utilities for states, initially empty
-              N_s, a table of frequencies for states, initially zero
-
-  if s' is new then U[s'] ← 0
-  if s is not null then
-    increment N_s[s]
-    U[s] ← U[s] + α(N_s[s]) × (r + γ U[s'] − U[s])
-  s ← s'
-  return π[s']</code></pre>
 <figure class="fig"><img src="../figures/ch22/fig-22-5.jpg" alt="شکل 22.5"><figcaption><strong>شکل ۲۲.۵ — منحنی‌های یادگیریِ TD برای جهانِ ۴×۳. (الف) برآوردهای مطلوبیت برای زیرمجموعهٔ انتخابی از حالت‌ها، (1,1)، (1,3)، (2,1)، (3,3) و (3,2)، به‌عنوانِ تابعی از تعدادِ کوشش‌ها (محورِ عمودی بازهٔ 0.5 تا 0.9)، برای اجرایِ تکیِ ۵۰۰ کوششی. با اجرایِ ۱۰۰ کوششیِ شکل ۲۲.۳ (الف) مقایسه کنید. (ب) ریشهٔ میانگینِ مربعاتِ خطا در برآوردِ U(1,1)، میانگین‌شده رویِ ۵۰ اجرایِ ۱۰۰ کوششی (محورِ عمودی بازهٔ 0.05 تا 0.2).</strong></figcaption></figure>
 <p>به همان سرعتی که عاملِ <span class="en-inline">ADP</span> یاد نمی‌گیرد و تغییرپذیریِ بسیار بالاتری نشان می‌دهد، اما بسیار ساده‌تر است و به محاسبهٔ بسیار کمتری در هر مشاهده نیاز دارد.</p>
 <p>توجه کنید <span class="en-inline">TD</span> برای انجامِ به‌روزرسانی‌هایش به مدلِ انتقال نیاز ندارد. خودِ محیط پیوندِ بینِ حالت‌های مجاور را در قالبِ انتقال‌های مشاهده‌شده فراهم می‌کند.</p>
@@ -288,17 +393,6 @@
 <p>قاعده در پایانِ هر پنج‌تاییِ <span class="en-inline">s, a, r, s′, a</span>′ اعمال می‌شود—از این رو نامِ آن. تفاوت با کیو-یادگیری کاملاً ظریف است: در حالی که کیو-یادگیری مقدارِ Q را از بهترین کنش در s′ پشتیبان‌گیری می‌کند، <span class="en-inline">SARSA</span> صبر می‌کند تا کنشی گرفته شود و مقدارِ Q را برای همان کنش پشتیبان‌گیری می‌کند. اگر عامل حریص باشد و همیشه کنشِ با بهترین مقدارِ Q را بگیرد، دو الگوریتم یکسان‌اند. اما وقتی کاوش در جریان است، متفاوت‌اند: اگر کاوش پاداشِ منفی به بار آورد، <span class="en-inline">SARSA</span> کنش را جریمه می‌کند، در حالی که کیو-یادگیری نمی‌کند.</p>
 <p>کیو-یادگیری الگوریتمِ یادگیریِ «خارج‌از-سیاست» (Off-Policy) است، زیرا مقادیرِ Qای را یاد می‌گیرد که به این پرسش پاسخ می‌دهند: «این کنش در این حالت چقدر ارزش دارد، به فرضِ اینکه استفاده از هر سیاستی که اکنون به‌کار می‌برم را متوقف کنم و طبقِ سیاستی شروع به عمل کنم که بهترین کنش را انتخاب می‌کند (طبقِ برآوردهای من)؟» <span class="en-inline">SARSA</span> الگوریتمِ «درون-سیاست» (On-Policy) است: مقادیرِ Qای را یاد می‌گیرد که به این پرسش پاسخ می‌دهند: «این کنش در این حالت چقدر ارزش دارد، به فرضِ اینکه به سیاستم بچسبم؟» کیو-یادگیری از <span class="en-inline">SARSA</span> انعطاف‌پذیرتر است، از این نظر که عاملِ کیو-یادگیری می‌تواند یاد بگیرد تحتِ کنترلِ طیفِ وسیعی از سیاست‌های کاوش خوب رفتار کند. از سوی دیگر، <span class="en-inline">SARSA</span> اگر سیاستِ کلی حتی تا حدی توسط عامل‌ها یا برنامه‌های دیگر کنترل شود مناسب است، که در آن صورت بهتر است تابعِ Qای برای آنچه واقعاً رخ خواهد داد یاد بگیریم، نه آنچه اگر عامل اجازه می‌یافت بهترین کنش‌های برآوردی را انتخاب کند رخ می‌داد. هر دوِ کیو-یادگیری و <span class="en-inline">SARSA</span> سیاستِ بهینه را برای جهانِ ۴×۳ یاد می‌گیرند، اما این کار را با نرخی بسیار کندتر از عاملِ <span class="en-inline">ADP</span> انجام می‌دهند. این به‌دلیلِ آن است که به‌روزرسانی‌های محلی از طریقِ مدل، سازگاری را در میانِ همهٔ مقادیرِ Q اعمال نمی‌کنند.</p>
 <figure class="fig"><img src="../figures/ch22/fig-22-8.jpg" alt="شکل 22.8"><figcaption><strong>شکل ۲۲.۸ — عاملِ کیو-یادگیریِ کاوشگر. یادگیرندهٔ فعالی است که ارزشِ Q(s,a) هر کنش را در هر موقعیت یاد می‌گیرد. از همان تابعِ کاوشِ f مثلِ عاملِ ADPِ کاوشگر استفاده می‌کند، اما از یادگیریِ مدلِ انتقال اجتناب می‌ورزد.</strong></figcaption></figure>
-<pre class="code"><code>function Q-LEARNING-AGENT(percept) returns an action
-  inputs: percept, a percept indicating current state s' and reward signal r
-  persistent: Q, a table of action values indexed by state and action, initially zero
-              N_sa, a table of frequencies for state-action pairs, initially zero
-              s, a, previous state and action, initially null
-
-  if s is not null then
-    increment N_sa[s, a]
-    Q[s, a] ← Q[s, a] + α(N_sa[s, a]) (r + γ max_{a'} Q[s', a'] − Q[s, a])
-  s, a ← s', argmax_{a'} f(Q[s', a'], N_sa[s', a'])
-  return a</code></pre>
 <h2 id="sec-4">۲۲.۴ تعمیم در یادگیریِ تقویتی</h2>
 <p>تاکنون فرض کرده‌ایم توابعِ مطلوبیت و توابعِ Q به‌صورتِ جدولی با یک مقدارِ خروجی برای هر حالت بازنمایی می‌شوند. این برای فضاهای حالتی تا حدودِ 10⁶ حالت کار می‌کند، که برای محیط‌های شبکه‌ایِ دوبعدیِ اسباب‌بازیِ ما بیش از کافی است. اما در محیط‌های جهانِ واقعی با حالت‌های بسیار بیشتر، همگرایی بیش‌ازحد کند خواهد بود. تخته‌نرد ساده‌تر از بیشترِ کاربردهای جهانِ واقعی است، با این حال حدودِ 10²<sup>⁰</sup> حالت دارد. نمی‌توانیم به‌آسانی همهٔ آن‌ها را برای یادگیریِ بازی بازدید کنیم.</p>
 <p>فصل ۵ ایدهٔ تابعِ ارزیابی را به‌عنوانِ سنجهٔ فشردهٔ مطلوبیت برای فضاهای حالتیِ بالقوهٔ بسیار بزرگ معرفی کرد. در اصطلاحِ این فصل، تابعِ ارزیابی تابعِ مطلوبیتِ تقریبی است؛ از اصطلاحِ «تقریبِ تابع» (Function Approximation) برای فرایندِ ساختِ تقریبِ فشرده‌ای از تابعِ مطلوبیت یا تابعِ Qِ واقعی استفاده می‌کنیم. برای نمونه، ممکن است تابعِ مطلوبیت را با ترکیبِ خطیِ وزن‌داری از ویژگی‌های f₁, ..., <span class="en-inline">f_n</span> تقریب بزنیم:</p>
