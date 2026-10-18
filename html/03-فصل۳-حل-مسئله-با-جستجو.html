@@ -45,7 +45,7 @@
   .toc { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 22px; box-shadow: var(--shadow); margin: 22px 0 34px; }
   .toc h2 { margin: 0 0 10px; font-size: 16px; color: var(--wine); border: 0; background: none; padding: 0; }
   .toc ol { margin: 0; padding: 0 20px 0 0; columns: 1; }
-  .toc li { margin: 3px 0; }
+  .toc li { margin: 3px 0; text-align: right; }
   .toc a { color: var(--navy); text-decoration: none; }
   .toc a:hover { color: var(--wine); }
   h2 {
@@ -56,14 +56,16 @@
   }
   h3 { color: var(--teal); font-size: 20px; margin: 28px 0 10px; }
   h4 { color: var(--navy); font-size: 17px; margin: 20px 0 8px; }
-  p { margin: 0 0 12px; }
+  p { margin: 0 0 12px; text-align: justify; text-justify: inter-word; }
   .lead {
     font-size: 18.5px; background: var(--card); border: 1px solid var(--line);
     border-radius: 16px; padding: 16px 18px; box-shadow: var(--shadow);
+    text-align: justify; text-justify: inter-word;
   }
   .box, .tip, .warn, .ok, .formula, .note, .quote {
     border-radius: 14px; padding: 14px 16px; margin: 14px 0;
     border: 1px solid var(--line);
+    text-align: justify; text-justify: inter-word;
   }
   .box { background: var(--card); }
   .tip { background: #fff8e6; border-color: #ead7a0; }
@@ -91,7 +93,7 @@
   tr:nth-child(even) td { background: #fbf7f0; }
   ul, ol { margin: 8px 0 14px; padding: 0 22px 0 0; }
   ol { list-style-type: persian; }
-  li { margin: 4px 0; }
+  li { margin: 4px 0; text-align: justify; text-justify: inter-word; }
   .en-inline { direction: ltr; display: inline-block; font-family: Georgia, "Times New Roman", serif; overflow-wrap: anywhere; }
   code { font-family: Consolas, "Courier New", monospace; direction: ltr; display: inline-block; background: #eef2f8; border: 1px solid #d7dee8; border-radius: 6px; padding: 0 5px; font-size: .88em; }
   pre.code {
@@ -104,7 +106,7 @@
   hr.soft { border: 0; border-top: 2px dashed var(--line); margin: 30px 0; }
   sup { font-size: .72em; }
   .footnotes { background: #f3efe6; border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; margin: 10px 0 20px; }
-  .fn { font-size: 14.5px; color: #454e5c; margin: 6px 0; }
+  .fn { font-size: 14.5px; color: #454e5c; margin: 6px 0; text-align: justify; text-justify: inter-word; }
   .summary-box { background: #24344d; color: #f6f0e6; border-radius: 18px; padding: 22px; margin-top: 16px; }
   .summary-box h2.sum-head { color: #f4e7c4; border: 0; background: none; padding: 0; margin-top: 0; }
   .summary-box h3 { color: #f0d48a; }
@@ -113,7 +115,7 @@
   .summary-box .en-inline { color: #d8e2f2; }
   figure.fig { margin: 24px 0 18px; text-align: center; }
   figure.fig img { max-width: 100%; height: auto; border-radius: 10px; box-shadow: var(--shadow); border: 1px solid var(--line); background: #fff; }
-  figure.fig figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; text-align: right; line-height: 1.75; }
+  figure.fig figcaption { font-size: 14px; color: var(--muted); margin-top: 8px; text-align: justify; text-justify: inter-word; line-height: 1.75; }
   figure.fig figcaption strong { color: var(--wine); }
   .footer-nav { margin-top: 36px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
   .footer-nav a { color: var(--teal); font-weight: 700; text-decoration: none; }

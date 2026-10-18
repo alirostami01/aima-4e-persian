@@ -44,7 +44,7 @@ html, body {
         break-inside: avoid; page-break-inside: avoid;
     }
     thead { display: table-header-group; }
-    p, li { orphans: 3; widows: 3; }
+    p, li { orphans: 3; widows: 3; text-align: justify; text-justify: inter-word; }
 }
 """
 
