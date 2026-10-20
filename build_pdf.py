@@ -1,487 +1,706 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Build the complete AIMA Persian book PDF from the chapter HTML files."""
+"""ساخت PDF کتاب «هوش مصنوعی: رویکردی نوین» (AIMA 4e) از فایل‌های HTML.
+
+خروجی‌ها:
+  pdf/aima-4e-persian.pdf       کل کتاب: صفحهٔ عنوان (با درج خودکار نسخه، تاریخ و کامیت)،
+                                فهرست مطالب (با شمارهٔ صفحه و پیوند قابل کلیک)،
+                                پیشگفتار، فصل‌های ۱ تا ۲۸ + نشانک‌های (Bookmarks) PDF
+  pdf/chapters/chapter-NN.pdf   PDF جداگانهٔ هر فصل (با نشانک بخش‌های همان فصل)
+
+موتور تبدیل: Chromium / Google Chrome (از راه Playwright) برای چیدمان بی‌نقص راست‌به‌چپ،
+شکل‌دهی حروف فارسی و تفکیک صفحات چاپی، و PyMuPDF برای نشانک‌ها، شمارهٔ صفحه‌های فهرست و فشرده‌سازی.
+فونت‌ها از pdf/fonts بارگذاری می‌شوند (Vazirmatn برای متن، DejaVu Sans Mono برای کد)
+و به نصب فونت روی سیستم نیازی نیست.
+
+پیش‌نیازها:
+    pip install playwright pymupdf
+    playwright install chromium  (یا استفاده از Chrome/Chromium نصب‌شده روی سیستم)
+
+اجرا:
+    python3 build_pdf.py                      # کل کتاب + همهٔ فصل‌ها
+    python3 build_pdf.py --book-only          # فقط کل کتاب
+    python3 build_pdf.py --chapters-only      # فقط PDF فصل‌ها
+    python3 build_pdf.py --chapters 1 2       # فقط فصل‌های مشخص (0 = پیشگفتار)
+    python3 build_pdf.py --page-size A4 --font-size 11
+"""
 
 from __future__ import annotations
 
 import argparse
-import io
+import datetime
+import html as htmllib
+import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
+import time
 from pathlib import Path
-
-from bs4 import BeautifulSoup
-from pypdf import PdfReader, PdfWriter
-from pypdf.generic import ArrayObject, DictionaryObject, FloatObject, NameObject, NumberObject
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from weasyprint import HTML
 
 ROOT = Path(__file__).resolve().parent
 HTML_DIR = ROOT / "html"
 PDF_DIR = ROOT / "pdf"
+FONTS_DIR = PDF_DIR / "fonts"
 DEFAULT_OUTPUT = PDF_DIR / "aima-4e-persian.pdf"
-CHAPTER_RE = re.compile(r"^(?P<number>\d+)-(?P<title>.+)\.html$")
+
+FA = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+PLACEHOLDER = "۸۸۸"
+
+TITLE_FA = "هوش مصنوعی: رویکردی نوین"
+TITLE_EN = "Artificial Intelligence: A Modern Approach (4th Edition)"
+AUTHORS = "استوارت راسل و پیتر نورویگ"
+SUBTITLE = "ویرایش چهارم — استوارت راسل و پیتر نورویگ"
+NOTE = "ترجمهٔ فارسی بر پایهٔ ویرایش چهارم کتاب مرجع هوش مصنوعی (AIMA 4th Edition)"
+
+PARTS = {
+    1: "بخش اول: هوش مصنوعی",
+    3: "بخش دوم: حل مسئله",
+    7: "بخش سوم: دانش، استدلال و برنامه‌ریزی",
+    12: "بخش چهارم: دانش و استدلال با عدم قطعیت",
+    19: "بخش پنجم: یادگیری ماشین",
+    23: "بخش ششم: ارتباط، ادراک و کنش",
+    27: "بخش هفتم: نتیجه‌گیری‌ها",
+}
 
 REMOVE_SELECTORS = (
     ".kicker", "nav.toc", ".footer-nav", ".top-link",
     ".web-only", ".screen-only", ".print-hidden",
 )
 
-PRINT_CSS = r"""
-@page { size: A4; margin: 18mm 17mm 20mm 17mm; }
-html, body {
-    print-color-adjust: exact !important;
-    -webkit-print-color-adjust: exact !important;
-}
-@media print {
-    .kicker, nav.toc, .footer-nav, .top-link,
-    .web-only, .screen-only, .print-hidden { display: none !important; }
-    .box, .tip, .warn, .ok, .formula, .note, .quote, .ex,
-    .summary-box, figure, pre, table, tr, img {
-        break-inside: avoid; page-break-inside: avoid;
+
+# ───────────────────────────── Jalali & Versioning ─────────────────────────────
+def gregorian_to_jalali(gy: int, gm: int, gd: int) -> tuple[int, int, int]:
+    """تبدیل تاریخ میلادی به هجری شمسی (الگوریتم بدون وابستگی)."""
+    g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
+    if gy > 1600:
+        jy = 979
+        gy -= 1600
+    else:
+        jy = 0
+        gy -= 621
+    gy2 = gy if gm > 2 else gy - 1
+    days = 365 * gy + (gy2 + 4) // 4 - (gy2 + 100) // 100 + (gy2 + 400) // 400 - 80 + gd + g_d_m[gm - 1]
+    jy += 33 * (days // 12053)
+    days %= 12053
+    jy += 4 * (days // 1461)
+    days %= 1461
+    if days > 365:
+        jy += (days - 1) // 365
+        days = (days - 1) % 365
+    if days < 186:
+        jm = 1 + days // 31
+        jd = 1 + days % 31
+    else:
+        jm = 7 + (days - 186) // 30
+        jd = 1 + (days - 186) % 30
+    return jy, jm, jd
+
+
+def get_version_info() -> dict:
+    """استخراج پویای نسخه، تعداد کامیت‌ها، هش آخرین کامیت و تاریخ ساخت."""
+    try:
+        commit_hash = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(ROOT), text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except Exception:
+        commit_hash = "master"
+
+    try:
+        commit_count = subprocess.check_output(
+            ["git", "rev-list", "--count", "HEAD"],
+            cwd=str(ROOT), text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except Exception:
+        commit_count = "1"
+
+    try:
+        status = subprocess.check_output(
+            ["git", "status", "--porcelain"],
+            cwd=str(ROOT), text=True, stderr=subprocess.DEVNULL
+        ).strip()
+        dirty_flag = " (با تغییرات محلی)" if status else ""
+    except Exception:
+        dirty_flag = ""
+
+    now = datetime.datetime.now()
+    jy, jm, jd = gregorian_to_jalali(now.year, now.month, now.day)
+    jalali_months = [
+        "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+        "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
+    ]
+    month_name = jalali_months[jm - 1]
+
+    version_num = f"۱.۰.{str(commit_count).translate(FA)}"
+    jalali_str = f"{str(jd).translate(FA)} {month_name} {str(jy).translate(FA)}"
+    gregorian_str = now.strftime("%Y/%m/%d").translate(FA)
+
+    return {
+        "version_num": version_num,
+        "commit_hash": commit_hash,
+        "dirty_flag": dirty_flag,
+        "jalali_date": jalali_str,
+        "gregorian_date": gregorian_str,
     }
-    thead { display: table-header-group; }
-    p, li { orphans: 3; widows: 3; text-align: justify; text-justify: inter-word; }
-}
+
+
+# ───────────────────────────── CSS ─────────────────────────────
+def css(page_size: str, font_pt: float) -> str:
+    f = FONTS_DIR.as_uri()
+    return f"""
+@font-face {{ font-family: 'VazirPDF'; src: url('{f}/Vazirmatn-Regular.ttf'); font-weight: 400; }}
+@font-face {{ font-family: 'VazirPDF'; src: url('{f}/Vazirmatn-Bold.ttf'); font-weight: 700; }}
+@font-face {{ font-family: 'MonoPDF'; src: url('{f}/DejaVuSansMono.ttf'); font-weight: 400; }}
+@font-face {{ font-family: 'MonoPDF'; src: url('{f}/DejaVuSansMono-Bold.ttf'); font-weight: 700; }}
+
+@page {{
+  size: {page_size};
+  margin: 20mm 18mm 18mm 18mm;
+  @bottom-center {{ content: counter(page, persian); font-family: 'VazirPDF'; font-size: 9pt; color: #666; }}
+}}
+@page cover {{ @bottom-center {{ content: none; }} }}
+
+html {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+body {{ margin: 0; font-family: 'VazirPDF', sans-serif; font-size: {font_pt}pt; line-height: 1.9; color: #1a1a1a; }}
+
+/* حذف قیدهای نمایشی صفحه و کادرها برای چاپ تمیز */
+article {{
+  max-width: none !important; margin: 0 !important; padding: 0 !important;
+  border: none !important; border-radius: 0 !important; box-shadow: none !important;
+  font-family: 'VazirPDF', sans-serif !important; line-height: 1.9 !important;
+}}
+article.unit {{ break-before: page; }}
+article.unit:first-child {{ break-before: auto; }}
+article.unit.single {{ break-before: auto; }}
+
+article h1 {{
+  font-size: 21pt !important; color: #2c5f8a !important;
+  border-bottom: 2.5pt solid #2c5f8a; padding-bottom: 3mm; margin-top: 0; margin-bottom: 5mm;
+}}
+article h2 {{
+  font-size: 15pt !important; color: #2c5f8a !important;
+  border-right: 4pt solid #8b2942; padding-right: 3mm; background: #fbf7f0;
+  margin-top: 8mm; margin-bottom: 3mm; padding-top: 1.5mm; padding-bottom: 1.5mm;
+}}
+article h3 {{ font-size: 13pt !important; color: #1b5c5a !important; margin-top: 6mm; margin-bottom: 2.5mm; }}
+article h4 {{ font-size: 11pt !important; color: #24344d !important; margin-top: 5mm; margin-bottom: 2mm; }}
+
+bdi[style*="monospace"], code, pre, pre *, td[style*="monospace"] {{ font-family: 'MonoPDF', monospace !important; }}
+bdi[style*="monospace"] {{ font-size: .86em !important; display: inline !important;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone; }}
+pre, pre.code {{
+  white-space: pre-wrap !important; overflow-wrap: anywhere; font-size: 8.5pt !important; line-height: 1.5 !important;
+  background: #24344d !important; color: #f0f4f8 !important; padding: 4mm 5mm !important; border-radius: 6px !important;
+  margin: 3.5mm 0 !important;
+}}
+pre code, pre.code code {{ background: transparent !important; border: none !important; color: inherit !important; font-size: inherit !important; }}
+code {{ background: #eef2f8; border: 1px solid #d7dee8; border-radius: 4px; padding: 0.5mm 1.5mm; font-size: .88em; }}
+
+h1, h2, h3, h4, h5 {{ break-after: avoid; }}
+p, li {{ orphans: 3; widows: 3; text-align: justify; text-justify: inter-word; }}
+figure, blockquote, aside, pre, tr, .box, .tip, .warn, .ok, .formula, .note, .quote, .ex, .summary-box {{
+  break-inside: avoid;
+}}
+figure {{ text-align: center; margin: 5mm 0; }}
+figure img {{ max-height: 185mm; max-width: 100%; object-fit: contain; }}
+figure figcaption {{ font-size: 9pt; color: #555; text-align: justify; margin-top: 2.5mm; line-height: 1.6; }}
+figure figcaption strong {{ color: #8b2942; }}
+
+table {{ font-size: .9em !important; width: 100%; border-collapse: collapse; margin: 4mm 0; }}
+th, td {{ border: 1px solid #d0d7de; padding: 2mm 3mm; vertical-align: top; }}
+th {{ background: #2c5f8a !important; color: #fff !important; font-weight: 700; text-align: right; }}
+tr:nth-child(even) td {{ background: #fbf7f0; }}
+thead {{ display: table-header-group; }}
+
+a {{ color: inherit; text-decoration: none; }}
+hr {{ border: none !important; border-top: .6pt solid #c8c8c8 !important; margin: 6mm 0 !important; }}
+
+/* جعبه‌ها و پیام‌ها */
+.box, .tip, .warn, .ok, .formula, .note, .quote {{
+  border-radius: 6px; padding: 3mm 4mm; margin: 3.5mm 0; border: 1px solid #e2d8c8; font-size: .95em;
+}}
+.box {{ background: #fdfdfc; }}
+.tip {{ background: #fffcf0; border-color: #ead7a0; }}
+.warn {{ background: #fdf2f4; border-color: #e3b7c2; }}
+.ok {{ background: #f0f8f4; border-color: #b7dec8; }}
+.formula {{ background: #f0f7f7; border-color: #b7d8d6; }}
+.note {{ background: #f2f5fa; border-color: #c9d4e4; }}
+.quote {{ background: #fff; border-right: 4pt solid #b8923a; color: #3f4653; font-style: italic; }}
+.lead {{ font-size: 1.05em; background: #fffcf8; border: 1px solid #e8dec8; border-radius: 6px; padding: 3.5mm 4.5mm; margin-bottom: 4mm; }}
+
+.summary-box {{ background: #24344d; color: #f6f0e6; border-radius: 8px; padding: 4.5mm 5.5mm; margin-top: 5mm; }}
+.summary-box h2.sum-head {{ color: #f4e7c4 !important; background: transparent !important; border: none !important; padding: 0 !important; margin-top: 0 !important; }}
+.summary-box h3 {{ color: #f0d48a !important; }}
+.summary-box p, .summary-box li {{ color: #e9eef7 !important; }}
+
+.footnotes {{ background: #f7f6f2; border: 1px solid #e0dad0; border-radius: 6px; padding: 3mm 4mm; margin-top: 4mm; font-size: .88em; }}
+.fn {{ color: #454e5c; margin: 1.5mm 0; }}
+
+/* بخش حمایت از پروژه */
+section.support-project {{
+  break-after: page; margin-top: 25mm !important; padding: 6mm 8mm !important;
+  border: 1px solid #e2d8c8; border-radius: 8px; background: #fdfdfc;
+}}
+section.support-project h2 {{ border-right: 4pt solid #2c5f8a !important; background: transparent !important; }}
+
+/* صفحهٔ عنوان */
+.cover {{
+  page: cover; height: 245mm; display: flex; flex-direction: column; justify-content: center;
+  text-align: center; break-after: page;
+}}
+.cover .t {{ font-size: 28pt; font-weight: 700; color: #2c5f8a; line-height: 1.6; }}
+.cover .en {{ direction: ltr; font-size: 14pt; font-weight: 700; margin-top: 8mm; color: #333; }}
+.cover .sub {{ font-size: 13pt; margin-top: 6mm; color: #444; }}
+.cover .note {{ font-size: 10pt; color: #666; margin-top: 15mm; }}
+.cover .bar {{ width: 60mm; height: 2mm; background: #2c5f8a; margin: 10mm auto 0; }}
+
+/* برچسب نسخه در صفحه اول */
+.cover .version-box {{
+  margin: 14mm auto 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2mm;
+  padding: 3mm 7mm;
+  background: #f7f9fb;
+  border: 1px solid #dce4ec;
+  border-radius: 8px;
+  font-size: 9pt;
+  color: #4a5568;
+}}
+.cover .version-box .v-pill {{
+  background: #2c5f8a;
+  color: #ffffff;
+  padding: 1.2mm 4.5mm;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 9pt;
+}}
+.cover .version-box .v-details {{
+  display: flex;
+  align-items: center;
+  gap: 2.5mm;
+  font-size: 8.5pt;
+  color: #555;
+}}
+.cover .version-box .v-details code {{
+  font-family: 'MonoPDF', monospace;
+  background: #e2e8f0;
+  padding: 0.4mm 1.8mm;
+  border-radius: 4px;
+  font-size: 8pt;
+  color: #1a202c;
+}}
+
+/* فهرست مطالب */
+.toc {{ page: cover; break-after: page; }}
+.toc .h {{
+  font-size: 20pt; font-weight: 700; color: #2c5f8a; border-bottom: 3px solid #2c5f8a;
+  padding-bottom: 2mm; margin-bottom: 4mm;
+}}
+.toc .part {{
+  font-weight: 700; color: #2c5f8a; margin: 5mm 0 1.5mm; font-size: 1.05em;
+  border-bottom: 1px solid #e2e8f0; padding-bottom: 1mm;
+}}
+.toc a.row {{ display: flex; align-items: baseline; gap: 2mm; color: inherit; break-inside: avoid; }}
+.toc a.row .dots {{
+  flex: 1; height: 1pt; min-width: 6mm; transform: translateY(-1.2mm);
+  background: radial-gradient(circle, #999 0.5pt, transparent 0.6pt) repeat-x left center / 3pt 1pt;
+}}
+.toc a.row .pg {{ min-width: 9mm; text-align: left; }}
+.toc a.l1 {{ font-weight: 700; margin-top: 2.2mm; font-size: 1em; }}
+.toc a.l2 {{ padding-right: 6mm; font-size: .9em; color: #333; margin-top: 1mm; }}
 """
 
 
-def discover_chapters() -> list[tuple[int, Path]]:
-    chapters = []
-    for path in HTML_DIR.glob("*.html"):
-        m = CHAPTER_RE.match(path.name)
-        if m:
-            chapters.append((int(m.group("number")), path))
-    chapters.sort(key=lambda x: x[0])
-    expected = list(range(29))
-    actual = [n for n, _ in chapters]
-    if actual != expected:
-        raise SystemExit(f"Chapter validation failed. Expected 00..28, found: {actual}")
-    return chapters
+# ───────────────────────────── HTML Assembly ─────────────────────────────
+def strip_tags(s: str) -> str:
+    return re.sub(r"\s+", " ", htmllib.unescape(re.sub(r"<[^>]+>", "", s))).strip()
 
 
-def chapter_title(path: Path) -> str:
+def cover_html(version_info: dict) -> str:
+    v = version_info
+    return (
+        f'<section class="cover">'
+        f'<div class="t">{TITLE_FA}</div>'
+        f'<div class="bar"></div>'
+        f'<div class="en">{TITLE_EN}</div>'
+        f'<div class="sub">{SUBTITLE}</div>'
+        f'<div class="note">{NOTE}</div>'
+        f'<div class="version-box">'
+        f'<div class="v-pill">نسخهٔ ویرایش کتاب: {v["version_num"]}</div>'
+        f'<div class="v-details">'
+        f'<span>تاریخ ایجاد PDF: {v["jalali_date"]} ({v["gregorian_date"]})</span>'
+        f'<span class="v-sep">•</span>'
+        f'<span>شناسه کامیت: <code>{v["commit_hash"]}</code>{v["dirty_flag"]}</span>'
+        f'</div></div></section>'
+    )
+
+
+def toc_html(entries: list, chapter_of: dict, pages: list[int] | None = None) -> str:
+    rows = ['<nav class="toc" aria-label="فهرست مطالب"><div class="h">فهرست مطالب</div>']
+    pg_done = []
+    for lvl, eid, title_html, *_ in entries:
+        n = chapter_of.get(eid)
+        if lvl == 1 and n in PARTS:
+            rows.append(f'<div class="part">{PARTS[n]}</div>')
+        pg = PLACEHOLDER if pages is None else str(pages[len(pg_done)]).translate(FA)
+        pg_done.append(eid)
+        rows.append(
+            f'<a class="row l{lvl}" href="#{eid}">'
+            f'<span class="t">{title_html}</span>'
+            f'<span class="dots"></span>'
+            f'<span class="pg">{pg}</span></a>'
+        )
+    rows.append("</nav>")
+    return "\n".join(rows)
+
+
+def load_unit(path: Path) -> tuple[str, list, int]:
+    """بارگذاری و تمیزسازی یک فایل HTML فصل.
+    
+    خروجی:
+      (article_html, [(level, id, title_html, title_clean, pos), ...], number of headings)
+    """
+    from bs4 import BeautifulSoup
+
+    num_m = re.match(r"^(\d+)-", path.name)
+    num = int(num_m.group(1)) if num_m else 0
+    anchor = f"chapter-{num:02d}"
+
     soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
-    node = soup.select_one(".subtitle") or soup.title
-    if node:
-        text = node.get_text(" ", strip=True)
-        if text:
-            return text
-    m = CHAPTER_RE.match(path.name)
-    return m.group("title") if m else path.stem
 
-
-def clean_html(path: Path) -> str:
-    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
-    for selector in REMOVE_SELECTORS:
-        for node in soup.select(selector):
+    # حذف بخش‌های اختصاصی وب و ناوبری
+    for sel in REMOVE_SELECTORS:
+        for node in soup.select(sel):
             node.decompose()
-
-    for node in list(soup.find_all(string=True)):
-        text = str(node)
-        if "این صفحه از ترجمهٔ فارسی فصل‌های کتاب" in text and "راسل" in text and "نورویگ" in text:
-            if node.parent:
-                node.parent.decompose()
-
-    for anchor in soup.find_all("a"):
-        href = anchor.get("href", "")
-        if isinstance(href, str) and href.startswith("file://"):
-            anchor["href"] = "#"
 
     for script in soup.find_all("script"):
         script.decompose()
 
-    style = soup.new_tag("style")
-    style.string = PRINT_CSS
-    if soup.head:
-        soup.head.append(style)
-    elif soup.html:
-        head = soup.new_tag("head")
-        head.append(style)
-        soup.html.insert(0, head)
-    return str(soup)
+    # غیرفعال‌سازی پیوندهای محلی file://
+    for a in soup.find_all("a"):
+        href = a.get("href", "")
+        if isinstance(href, str) and href.startswith("file://"):
+            a["href"] = "#"
 
+    # حذف پیام‌های پیش‌فرض ترجمه
+    for node in list(soup.find_all(string=True)):
+        text = str(node)
+        if "این صفحه از ترجمهٔ فارسی فصل‌های کتاب" in text and "راسل" in text:
+            if node.parent:
+                node.parent.decompose()
 
-def render_chapters(chapters: list[tuple[int, Path]], temp_dir: Path):
-    rendered = []
-    for index, (number, path) in enumerate(chapters, 1):
-        print(f"[{index:02d}/{len(chapters):02d}] {path.name}")
-        output = temp_dir / f"chapter-{number:02d}.pdf"
-        HTML(string=clean_html(path), base_url=str(path.parent)).write_pdf(str(output))
-        pages = len(PdfReader(str(output)).pages)
-        if pages <= 0:
-            raise RuntimeError(f"Chapter {number:02d} produced an empty PDF")
-        print(f"       → {pages} pages")
-        rendered.append((number, chapter_title(path), output, pages))
-    return rendered
+    # استخراج عنوان فصل
+    entries = []
+    pos = 0
 
+    if num == 0:
+        chapter_title_text = "پیشگفتار"
+        chapter_title_html = "پیشگفتار"
+    else:
+        sub_node = soup.select_one(".subtitle")
+        if sub_node:
+            chapter_title_html = "".join(str(c) for c in sub_node.contents).strip()
+            chapter_title_text = sub_node.get_text(" ", strip=True)
+            sub_node.decompose()
+        elif soup.title:
+            chapter_title_html = soup.title.get_text(strip=True)
+            chapter_title_text = chapter_title_html
+        else:
+            chapter_title_html = f"فصل {str(num).translate(FA)}"
+            chapter_title_text = chapter_title_html
 
-def find_font() -> str | None:
-    """Find a Unicode font that can be explicitly embedded in the TOC."""
-    patterns = (
-        "Noto Sans Arabic:style=Regular",
-        "Noto Sans:style=Regular",
-        "DejaVu Sans:style=Book",
+    entries.append((1, anchor, chapter_title_html, chapter_title_text, 0))
+
+    # شناسایی و استخراج بخش‌های H2
+    h2_idx = 0
+    for h2 in soup.find_all("h2"):
+        h2_text = h2.get_text(" ", strip=True)
+        if not h2_text or h2_text == "پانوشت‌ها:":
+            continue
+        h2_idx += 1
+        orig_id = h2.get("id")
+        h2_id = f"{anchor}-{orig_id}" if orig_id else f"{anchor}-sec-{h2_idx}"
+        h2["id"] = h2_id
+        pos += 1
+        h2_html = "".join(str(c) for c in h2.contents).strip()
+        entries.append((2, h2_id, h2_html, h2_text, pos))
+
+    # استخراج محتوای درون body یا .page
+    container = soup.select_one(".page") or soup.body or soup
+    body_content = "".join(str(c) for c in container.children if str(c).strip())
+
+    article_html = (
+        f'<article id="{anchor}" class="unit" dir="rtl" lang="fa">\n'
+        f'  <h1 id="{anchor}">{chapter_title_html}</h1>\n'
+        f"{body_content}\n"
+        f'</article>'
     )
-    for pattern in patterns:
-        try:
-            result = subprocess.run(
-                ["fc-match", "-f", "%{file}", pattern],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            candidate = Path(result.stdout.strip())
-            if candidate.exists():
-                return str(candidate)
-        except (FileNotFoundError, subprocess.CalledProcessError):
-            pass
 
-    for candidate in (
-        "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSansArabic-Regular.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ):
-        if Path(candidate).exists():
-            return candidate
-    return None
+    return article_html, entries, pos + 1
 
 
-def make_toc_pdf(entries: list[tuple[int, str, int]], output: Path, font_path: str | None):
-    """Render the Persian TOC and return its page count and row rectangles."""
-    if not font_path:
-        raise RuntimeError(
-            "No Unicode font was found for the Persian TOC. Install Noto Sans "
-            "or DejaVu Sans and run the build again."
-        )
-
-    rows = []
-    for number, title, page_number in entries:
-        rows.append(
-            f'<div class="toc-row">'
-            f'<span class="toc-title" dir="rtl"><bdi>{number:02d}. {escape_html(title)}</bdi></span>'
-            f'<span class="toc-dots"></span>'
-            f'<span class="toc-page" dir="ltr">{page_number}</span>'
-            f'</div>'
-        )
-
-    font_face = Path(font_path).as_uri()
-    html = f"""<!doctype html>
-<html lang="fa" dir="rtl">
-<head>
-<meta charset="utf-8">
-<style>
-@font-face {{
-  font-family: AIMA-Persian;
-  src: url('{font_face}');
-  font-weight: 400;
-}}
-@page {{ size: A4; margin: 15mm 17mm 16mm 17mm; }}
-* {{ box-sizing: border-box; }}
-html, body {{ margin: 0; padding: 0; direction: rtl; }}
-body {{
-  font-family: AIMA-Persian, "Noto Sans Arabic", "DejaVu Sans", sans-serif;
-  font-size: 10pt;
-  line-height: 1.2;
-  direction: rtl;
-  color: #222;
-}}
-.header {{ height: 58pt; margin: 0; text-align: center; }}
-.header h1 {{ margin: 0 0 5pt; font-size: 19pt; line-height: 23pt; font-weight: 700; }}
-.header p {{ margin: 0; font-size: 9pt; line-height: 11pt; }}
-.toc-list {{ margin: 0; padding: 0; }}
-.toc-row {{ height: 21pt; page-break-inside: avoid; display: flex; align-items: center; direction: rtl; }}
-.toc-title {{ flex: 0 1 auto; white-space: nowrap; direction: rtl; unicode-bidi: isolate; }}
-.toc-dots {{ flex: 1 1 auto; min-width: 10pt; border-bottom: 1px dotted #888; margin: 0 8pt 3pt; }}
-.toc-page {{ flex: 0 0 28pt; direction: ltr; unicode-bidi: isolate; text-align: left; }}
-</style>
-</head>
-<body>
-<div class="header">
-  <h1 dir="rtl">فهرست مطالب</h1>
-  <p dir="rtl">هوش مصنوعی: یک رویکرد مدرن — ویرایش چهارم</p>
-</div>
-<div class="toc-list">{''.join(rows)}</div>
-</body>
-</html>"""
-
-    HTML(string=html, base_url=str(ROOT)).write_pdf(str(output))
-    pages = len(PdfReader(str(output)).pages)
-    if pages <= 0:
-        raise RuntimeError("TOC PDF is empty")
-
-    page_width, page_height = A4
-    margin_left = 17 * 72 / 25.4
-    margin_top = 15 * 72 / 25.4
-    header_height = 58.0
-    row_h = 21.0
-    first_row_top = page_height - margin_top - header_height
-
-    rectangles = []
-    for index, _entry in enumerate(entries):
-        top = first_row_top - index * row_h
-        bottom = top - row_h
-        rectangles.append((0, margin_left, bottom, page_width - margin_left, top))
-
-    return pages, rectangles
-
-
-def escape_html(text: str) -> str:
+def document(body: str, title: str, args) -> str:
     return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
+        "<!DOCTYPE html>\n"
+        f'<html lang="fa" dir="rtl"><head><meta charset="utf-8">'
+        f'<base href="{HTML_DIR.as_uri()}/">'
+        f"<title>{htmllib.escape(title)}</title>"
+        f"<style>{css(args.page_size, args.font_size)}</style></head>"
+        f'<body dir="rtl">\n{body}\n</body></html>'
     )
 
 
-def add_global_page_numbers(writer: PdfWriter) -> None:
-    for index, page in enumerate(writer.pages, 1):
-        packet = io.BytesIO()
-        c = canvas.Canvas(packet, pagesize=A4)
-        c.setFont("Helvetica", 8.5)
-        c.drawCentredString(A4[0] / 2, 18, str(index))
-        c.save()
-        packet.seek(0)
-        page.merge_page(PdfReader(packet).pages[0])
+# ───────────────────────────── Rendering ─────────────────────────────
+class Renderer:
+    def __init__(self, args):
+        from playwright.sync_api import sync_playwright
 
+        self._pw = sync_playwright().start()
+        opts = {
+            "args": [
+                "--no-sandbox",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+                "--font-render-hinting=none",
+            ]
+        }
 
-def add_internal_link(page, rect, target_page):
-    x1, y1, x2, y2 = rect
-    annotation = DictionaryObject({
-        NameObject("/Type"): NameObject("/Annot"),
-        NameObject("/Subtype"): NameObject("/Link"),
-        NameObject("/Rect"): ArrayObject([
-            FloatObject(x1), FloatObject(y1), FloatObject(x2), FloatObject(y2)
-        ]),
-        NameObject("/Border"): ArrayObject([
-            NumberObject(0), NumberObject(0), NumberObject(0)
-        ]),
-        NameObject("/Dest"): ArrayObject([
-            target_page.indirect_reference, NameObject("/Fit")
-        ]),
-    })
-    annots = page.get("/Annots")
-    if annots is None:
-        annots = ArrayObject()
-        page[NameObject("/Annots")] = annots
-    annots.append(annotation)
+        # یافتن مسیر خودکار Chrome / Chromium
+        chrome_cand = (
+            args.chromium
+            or os.environ.get("CHROMIUM_PATH")
+            or shutil.which("google-chrome")
+            or shutil.which("google-chrome-stable")
+            or shutil.which("chromium")
+            or shutil.which("chromium-browser")
+        )
+        if chrome_cand and os.path.exists(chrome_cand):
+            opts["executable_path"] = chrome_cand
 
-
-def _outline_title(item) -> str:
-    """Return an outline item's title without depending on a pypdf version."""
-    title = getattr(item, "title", None)
-    if title is None and isinstance(item, dict):
-        title = item.get("/Title")
-    return str(title or "").strip()
-
-
-def _copy_outline_items(
-    writer: PdfWriter,
-    reader: PdfReader,
-    items,
-    page_offset: int,
-    parent=None,
-    skip_first_root: bool = False,
-) -> int:
-    """Copy a pypdf outline tree into the merged writer.
-
-    WeasyPrint creates the detailed heading outline in each chapter PDF. Once
-    chapter PDFs are merged, those destinations still point at the source
-    reader's page tree, so they cannot simply be reused. This function resolves
-    every destination to its source page number and recreates it against the
-    final writer with the chapter page offset applied.
-
-    Nested lists returned by PdfReader.outline represent child bookmarks.
-    """
-    copied = 0
-    index = 0
-    while index < len(items):
-        item = items[index]
-        if isinstance(item, list):
-            index += 1
-            continue
-
-        title = _outline_title(item)
         try:
-            source_page = reader.get_destination_page_number(item)
+            self.browser = self._pw.chromium.launch(**opts)
+        except Exception as e:
+            self._pw.stop()
+            sys.exit(
+                f"Chromium/Chrome اجرا نشد: {e}\n"
+                "راه‌حل: «playwright install chromium» را اجرا کنید یا مسیر Chrome را با --chromium مشخص کنید."
+            )
+        self.tmpdir = Path(tempfile.mkdtemp(prefix="aimapdf-"))
+
+    def render(self, html: str, name: str) -> bytes:
+        f = self.tmpdir / f"{name}.html"
+        f.write_text(html, encoding="utf-8")
+        page = self.browser.new_page()
+        try:
+            page.goto(f.as_uri(), wait_until="load", timeout=900_000)
+            page.evaluate("document.fonts.ready")
+            return page.pdf(
+                prefer_css_page_size=True,
+                print_background=True,
+                outline=True,
+                tagged=True,
+            )
+        finally:
+            page.close()
+
+    def close(self):
+        try:
+            self.browser.close()
+            self._pw.stop()
         except Exception:
-            source_page = None
-
-        children = items[index + 1] if index + 1 < len(items) and isinstance(items[index + 1], list) else None
-
-        if skip_first_root and copied == 0:
-            # The chapter-level bookmark is already created by build(). Keep
-            # its children, but avoid creating a duplicate chapter bookmark.
-            if children:
-                copied += _copy_outline_items(
-                    writer, reader, children, page_offset, parent=parent
-                )
-            index += 2 if children is not None else 1
-            continue
-
-        new_parent = parent
-        if source_page is not None and title:
-            final_page = page_offset + source_page
-            new_parent = writer.add_outline_item(title, final_page, parent=parent)
-            copied += 1
-
-        if children:
-            copied += _copy_outline_items(
-                writer, reader, children, page_offset, parent=new_parent
-            )
-            index += 2
-        else:
-            index += 1
-
-    return copied
+            pass
+        if self.tmpdir.exists():
+            shutil.rmtree(self.tmpdir, ignore_errors=True)
 
 
-def add_chapter_outlines(
-    writer: PdfWriter,
-    rendered,
-    chapter_indices: dict[int, int],
-) -> int:
-    """Create chapter bookmarks and preserve all detailed chapter headings."""
-    total = 0
-    for number, title, chapter_pdf, _pages in rendered:
-        chapter_reader = PdfReader(str(chapter_pdf))
-        chapter_root = writer.add_outline_item(
-            f"{number:02d}. {title}", chapter_indices[number]
-        )
-        outline = chapter_reader.outline
-        if not outline:
-            continue
-
-        # Usually the first root item is the chapter <h1>/<h2> itself. It is
-        # redundant because chapter_root above already represents that level.
-        # Its children are nevertheless copied under the chapter root.
-        copied = _copy_outline_items(
-            writer,
-            chapter_reader,
-            outline,
-            page_offset=chapter_indices[number],
-            parent=chapter_root,
-            skip_first_root=True,
-        )
-        total += copied
-
-    return total
-
-
-def build(output: Path, keep_chapters: bool = False) -> None:
-    chapters = discover_chapters()
-    PDF_DIR.mkdir(parents=True, exist_ok=True)
-
-    with tempfile.TemporaryDirectory(prefix="aima-pdf-") as temp_name:
-        temp_dir = Path(temp_name)
-        rendered = render_chapters(chapters, temp_dir)
-        toc_path = temp_dir / "toc.pdf"
-        font_path = find_font()
-
-        toc_pages = 1
-        for _ in range(5):
-            cursor = toc_pages + 1
-            entries = []
-            for number, title, _pdf, pages in rendered:
-                entries.append((number, title, cursor))
-                cursor += pages
-            new_pages, _ = make_toc_pdf(entries, toc_path, font_path)
-            if new_pages == toc_pages:
-                break
-            toc_pages = new_pages
-        else:
-            raise RuntimeError("TOC page count did not stabilize")
-
-        cursor = toc_pages + 1
-        entries = []
-        for number, title, _pdf, pages in rendered:
-            entries.append((number, title, cursor))
-            cursor += pages
-        final_toc_pages, toc_rects = make_toc_pdf(entries, toc_path, font_path)
-
-        if final_toc_pages != toc_pages:
-            toc_pages = final_toc_pages
-            cursor = toc_pages + 1
-            entries = []
-            for number, title, _pdf, pages in rendered:
-                entries.append((number, title, cursor))
-                cursor += pages
-            final_toc_pages, toc_rects = make_toc_pdf(entries, toc_path, font_path)
-            if final_toc_pages != toc_pages:
-                raise RuntimeError("TOC page count did not stabilize during final generation")
-
-        writer = PdfWriter()
-        for page in PdfReader(str(toc_path)).pages:
-            writer.add_page(page)
-
-        chapter_indices = {}
-        current_index = toc_pages
-        for number, _title, chapter_pdf, _pages in rendered:
-            chapter_indices[number] = current_index
-            for page in PdfReader(str(chapter_pdf)).pages:
-                writer.add_page(page)
-                current_index += 1
-
-        heading_count = add_chapter_outlines(writer, rendered, chapter_indices)
-        writer.add_outline_item("فهرست مطالب", 0)
-
-        for row_index, (number, _title, _page_number) in enumerate(entries):
-            if row_index >= len(toc_rects):
-                break
-            toc_page_no, x1, y1, x2, y2 = toc_rects[row_index]
-            if toc_page_no >= toc_pages:
+def get_toc_pages(doc, n_entries: int) -> list[int]:
+    """استخراج شمارهٔ صفحات هدف پیوندهای فهرست از گذر نخست."""
+    rows = []
+    for pno in range(1, doc.page_count):
+        links = [l for l in doc[pno].get_links() if l.get("page", -1) >= 0]
+        links.sort(key=lambda l: (round(l["from"].y0, 0), -l["from"].x1))
+        for l in links:
+            key = (pno, round(l["from"].y0))
+            if rows and rows[-1][0][0] == pno and abs(rows[-1][0][1] - key[1]) <= 2:
                 continue
-            add_internal_link(
-                writer.pages[toc_page_no],
-                (x1, y1, x2, y2),
-                writer.pages[chapter_indices[number]],
-            )
-
-        writer.add_metadata({
-            "/Title": "هوش مصنوعی: رویکردی نوین — ویرایش چهارم",
-            "/Author": "علی رستمی",
-            "/Subject": "ترجمهٔ فارسی کتاب Artificial Intelligence: A Modern Approach, 4th Edition",
-            "/Creator": "build_pdf.py",
-        })
-
-        add_global_page_numbers(writer)
-
-        output.parent.mkdir(parents=True, exist_ok=True)
-        with output.open("wb") as fh:
-            writer.write(fh)
-
-        if keep_chapters:
-            chapter_dir = PDF_DIR / "chapters"
-            chapter_dir.mkdir(parents=True, exist_ok=True)
-            for number, _title, chapter_pdf, _pages in rendered:
-                shutil.copy2(chapter_pdf, chapter_dir / f"{number:02d}.pdf")
-
-        final_reader = PdfReader(str(output))
-        print("\nPDF successfully created")
-        print(f"Output : {output}")
-        print(f"Pages  : {len(final_reader.pages)}")
-        print(f"Size   : {output.stat().st_size / (1024 * 1024):.2f} MB")
-        print(f"TOC    : clickable + page numbers")
-        print(f"Outline: chapter bookmarks + {heading_count} detailed heading bookmarks")
+            rows.append((key, l["page"] + 1))
+            if len(rows) == n_entries:
+                break
+        if len(rows) == n_entries:
+            break
+    if len(rows) != n_entries:
+        raise RuntimeError(f"تعداد ردیف‌های فهرست ({n_entries}) با پیوندهای یافت‌شده ({len(rows)}) برابر نیست.")
+    return [p for _, p in rows]
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "-o", "--output", type=Path, default=DEFAULT_OUTPUT,
-        help=f"Output PDF path (default: {DEFAULT_OUTPUT})",
+def count_toc_pages(doc, n_entries: int) -> int:
+    """محاسبهٔ تعداد صفحات فهرست مطالب."""
+    count = 0
+    rows_found = 0
+    for pno in range(1, doc.page_count):
+        links = [l for l in doc[pno].get_links() if l.get("page", -1) >= 0]
+        if not links:
+            break
+        count += 1
+        rows_found += len(links)
+        if rows_found >= n_entries:
+            break
+    return count
+
+
+def finalize(pdf_bytes: bytes, out: Path, title: str, toc: list | None) -> int:
+    import pymupdf
+
+    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    if toc is not None:
+        doc.set_toc(toc)
+    doc.set_metadata({
+        "title": title,
+        "author": f"{AUTHORS} — ترجمهٔ فارسی",
+        "subject": TITLE_EN,
+        "creator": "build_pdf.py (Chromium + PyMuPDF)",
+    })
+    out.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(out, garbage=3, deflate=True)
+    pages = doc.page_count
+    doc.close()
+    return pages
+
+
+def outline_from_chromium(pdf_bytes: bytes, entries: list, n_heads: int) -> list:
+    """ایجاد نشانک‌های تمیز فارسی برای یک فصل جداگانه."""
+    import pymupdf
+
+    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    raw = [it for it in doc.get_toc(simple=True) if it[0] <= 2]
+    doc.close()
+    if len(raw) != n_heads:
+        return [[1, e[3], 1] for e in entries if e[0] == 1]
+    return [[lvl, txt, 1 if pos is None else raw[pos][2]] for lvl, _, _, txt, pos in entries]
+
+
+# ───────────────────────────── Builds ─────────────────────────────
+def discover_chapters() -> list[tuple[int, Path]]:
+    chapters = []
+    for p in sorted(HTML_DIR.glob("*.html")):
+        m = re.match(r"^(\d+)-", p.name)
+        if m:
+            chapters.append((int(m.group(1)), p))
+    chapters.sort(key=lambda x: x[0])
+    return chapters
+
+
+def build_book(r: Renderer, args, version_info: dict):
+    import pymupdf
+
+    t0 = time.time()
+    chapters = discover_chapters()
+    arts, entries, chapter_of = [], [], {}
+
+    print(f"بارگذاری و آماده‌سازی {len(chapters)} فصل…", flush=True)
+    for num, path in chapters:
+        a, e, _ = load_unit(path)
+        arts.append(a)
+        entries += e
+        chapter_of[f"chapter-{num:02d}"] = num
+
+    body_gen = lambda pages: (
+        cover_html(version_info)
+        + "\n"
+        + toc_html(entries, chapter_of, pages)
+        + "\n"
+        + "\n".join(arts)
     )
-    parser.add_argument(
-        "--keep-chapters", action="store_true",
-        help="Also copy rendered chapter PDFs to pdf/chapters/",
+
+    print("  گذر ۱: چیدمان اولیه و محاسبهٔ صفحات فهرست…", flush=True)
+    pdf1 = r.render(document(body_gen(None), TITLE_FA, args), "book-pass1")
+    d1 = pymupdf.open(stream=pdf1, filetype="pdf")
+    pages = get_toc_pages(d1, len(entries))
+    d1.close()
+
+    print("  گذر ۲: درج شماره‌های صفحه در فهرست و نهایی‌سازی…", flush=True)
+    pdf2 = r.render(document(body_gen(pages), TITLE_FA, args), "book-pass2")
+    d2 = pymupdf.open(stream=pdf2, filetype="pdf")
+    pages_pass2 = get_toc_pages(d2, len(entries))
+    if pages_pass2 != pages:
+        # در صورت جابه‌جایی جزئی، با یک گذر دیگر همگام‌سازی می‌شود
+        pdf2 = r.render(document(body_gen(pages_pass2), TITLE_FA, args), "book-pass3")
+        pages = pages_pass2
+    d2.close()
+
+    toc = [[1, "فهرست مطالب", 2]] + [[e[0], e[3], pages[i]] for i, e in enumerate(entries)]
+    out_file = PDF_DIR / "aima-4e-persian.pdf"
+    n_pages = finalize(pdf2, out_file, TITLE_FA, toc)
+    print(
+        f"  ✓ {out_file.relative_to(ROOT)} — {n_pages} صفحه، {len(entries)} سرفصل در فهرست "
+        f"({out_file.stat().st_size / 1e6:.1f} MB، {time.time() - t0:.0f} ثانیه)"
     )
-    args = parser.parse_args()
-    build(args.output, args.keep_chapters)
+
+
+def build_chapters(r: Renderer, args):
+    sel = set(args.chapters) if args.chapters else None
+    chapters = discover_chapters()
+    chapters_dir = PDF_DIR / "chapters"
+    chapters_dir.mkdir(parents=True, exist_ok=True)
+
+    for num, path in chapters:
+        if sel is not None and num not in sel:
+            continue
+        art, entries, n_heads = load_unit(path)
+        art = art.replace('class="unit"', 'class="unit single"', 1)
+        title = entries[0][3] if entries else f"فصل {num}"
+        pdf = r.render(document(art, f"{title} — {TITLE_FA}", args), f"ch-{num:02d}")
+        toc = outline_from_chromium(pdf, entries, n_heads)
+        out = chapters_dir / f"chapter-{num:02d}.pdf"
+        pages = finalize(pdf, out, f"{title} — {TITLE_FA}", toc)
+        print(f"  ✓ {out.relative_to(ROOT)} — {pages} صفحه ({out.stat().st_size / 1e6:.1f} MB)", flush=True)
+
+
+def main():
+    ap = argparse.ArgumentParser(description="ساخت PDF کتاب AIMA 4e (با فهرست و نشانک) و PDF جداگانهٔ فصل‌ها")
+    g = ap.add_mutually_exclusive_group()
+    g.add_argument("--book-only", action="store_true", help="فقط ساخت کل کتاب (pdf/aima-4e-persian.pdf)")
+    g.add_argument("--chapters-only", action="store_true", help="فقط ساخت PDF فصل‌ها")
+    ap.add_argument("--chapters", type=int, nargs="+", metavar="N", help="فقط این فصل‌ها (0 = پیشگفتار)")
+    ap.add_argument("--chromium", default=os.environ.get("CHROMIUM_PATH"),
+                    help="مسیر Chrome/Chromium (پیش‌فرض: جستجوی خودکار سیستم یا Playwright)")
+    ap.add_argument("--page-size", default="A4", help="اندازهٔ صفحه مانند A4 یا Letter (پیش‌فرض: A4)")
+    ap.add_argument("--font-size", type=float, default=11, help="اندازهٔ قلم متن به pt (پیش‌فرض: 11)")
+    ap.add_argument("--out-dir", type=Path, default=None, help="پوشهٔ خروجی (پیش‌فرض: pdf/)")
+    args = ap.parse_args()
+
+    if args.chapters:
+        args.chapters_only = True
+    if args.out_dir:
+        global PDF_DIR
+        PDF_DIR = args.out_dir.resolve()
+
+    missing = [f for f in ("Vazirmatn-Regular.ttf", "Vazirmatn-Bold.ttf", "DejaVuSansMono.ttf")
+               if not (FONTS_DIR / f).exists()]
+    if missing:
+        sys.exit(f"فونت‌ها در {FONTS_DIR} پیدا نشدند: {missing}")
+
+    version_info = get_version_info()
+    print("=" * 60)
+    print(f"ساخت PDF کتاب {TITLE_FA}")
+    print(f"نسخه: {version_info['version_num']} | کامیت: {version_info['commit_hash']}{version_info['dirty_flag']}")
+    print(f"تاریخ: {version_info['jalali_date']} ({version_info['gregorian_date']})")
+    print("=" * 60)
+
+    r = Renderer(args)
+    try:
+        if not args.chapters_only:
+            print("\nساخت کتاب کامل:")
+            build_book(r, args, version_info)
+        if not args.book_only:
+            print("\nساخت PDF فصل‌ها:")
+            build_chapters(r, args)
+    finally:
+        r.close()
 
 
 if __name__ == "__main__":
