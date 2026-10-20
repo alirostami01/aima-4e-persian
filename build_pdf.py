@@ -258,40 +258,18 @@ section.support-project h2 {{ border-right: 4pt solid #2c5f8a !important; backgr
 
 /* برچسب نسخه در صفحه اول */
 .cover .version-box {{
-  margin: 14mm auto 0;
+  margin: 16mm auto 0;
   display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2mm;
-  padding: 3mm 7mm;
-  background: #f7f9fb;
-  border: 1px solid #dce4ec;
-  border-radius: 8px;
-  font-size: 9pt;
-  color: #4a5568;
+  justify-content: center;
 }}
 .cover .version-box .v-pill {{
   background: #2c5f8a;
   color: #ffffff;
-  padding: 1.2mm 4.5mm;
+  padding: 2mm 6mm;
   border-radius: 20px;
   font-weight: 700;
-  font-size: 9pt;
-}}
-.cover .version-box .v-details {{
-  display: flex;
-  align-items: center;
-  gap: 2.5mm;
-  font-size: 8.5pt;
-  color: #555;
-}}
-.cover .version-box .v-details code {{
-  font-family: 'MonoPDF', monospace;
-  background: #e2e8f0;
-  padding: 0.4mm 1.8mm;
-  border-radius: 4px;
-  font-size: 8pt;
-  color: #1a202c;
+  font-size: 9.5pt;
+  letter-spacing: 0.3px;
 }}
 
 /* فهرست مطالب */
@@ -322,6 +300,7 @@ def strip_tags(s: str) -> str:
 
 def cover_html(version_info: dict) -> str:
     v = version_info
+    commit_str = f" (کامیت: {v['commit_hash']}{v['dirty_flag']})" if v.get("commit_hash") else ""
     return (
         f'<section id="cover" class="cover">'
         f'<div class="t">{TITLE_FA}</div>'
@@ -330,12 +309,8 @@ def cover_html(version_info: dict) -> str:
         f'<div class="sub">{SUBTITLE}</div>'
         f'<div class="note">{NOTE}</div>'
         f'<div class="version-box">'
-        f'<div class="v-pill">نسخهٔ ویرایش کتاب: {v["version_num"]}</div>'
-        f'<div class="v-details">'
-        f'<span>تاریخ ایجاد PDF: {v["jalali_date"]} ({v["gregorian_date"]})</span>'
-        f'<span class="v-sep">•</span>'
-        f'<span>شناسه کامیت: <code>{v["commit_hash"]}</code>{v["dirty_flag"]}</span>'
-        f'</div></div></section>'
+        f'<div class="v-pill">نسخهٔ ترجمهٔ کتاب: {v["version_num"]}{commit_str}</div>'
+        f'</div></section>'
     )
 
 
