@@ -323,7 +323,7 @@ def strip_tags(s: str) -> str:
 def cover_html(version_info: dict) -> str:
     v = version_info
     return (
-        f'<section class="cover">'
+        f'<section id="cover" class="cover">'
         f'<div class="t">{TITLE_FA}</div>'
         f'<div class="bar"></div>'
         f'<div class="en">{TITLE_EN}</div>'
@@ -415,7 +415,17 @@ def load_unit(path: Path) -> tuple[str, list, int]:
 
     entries.append((1, anchor, chapter_title_html, chapter_title_text, 0))
 
+    # حذف پیام‌های ادامه یا پیوندهای پایان فصل
+    for p in soup.find_all("p"):
+        p_txt = p.get_text(strip=True)
+        if "[ادامه:" in p_txt or "*[ادامه:" in p_txt:
+            prev = p.find_previous_sibling()
+            if prev and prev.name == "hr":
+                prev.decompose()
+            p.decompose()
+
     # شناسایی و استخراج بخش‌های H2
+    used_ids = set()
     h2_idx = 0
     for h2 in soup.find_all("h2"):
         h2_text = h2.get_text(" ", strip=True)
@@ -423,11 +433,14 @@ def load_unit(path: Path) -> tuple[str, list, int]:
             continue
         h2_idx += 1
         orig_id = h2.get("id")
-        h2_id = f"{anchor}-{orig_id}" if orig_id else f"{anchor}-sec-{h2_idx}"
-        h2["id"] = h2_id
+        candidate = f"{anchor}-{orig_id}" if orig_id else f"{anchor}-h2-{h2_idx}"
+        while candidate in used_ids:
+            candidate = f"{candidate}-{h2_idx}"
+        used_ids.add(candidate)
+        h2["id"] = candidate
         pos += 1
         h2_html = "".join(str(c) for c in h2.contents).strip()
-        entries.append((2, h2_id, h2_html, h2_text, pos))
+        entries.append((2, candidate, h2_html, h2_text, pos))
 
     # استخراج محتوای درون body یا .page
     container = soup.select_one(".page") or soup.body or soup
@@ -601,6 +614,10 @@ def build_book(r: Renderer, args, version_info: dict):
     chapters = discover_chapters()
     arts, entries, chapter_of = [], [], {}
 
+    cover_title = f"صفحهٔ اول: {TITLE_FA}"
+    cover_entry = (1, "cover", cover_title, cover_title, 0)
+    entries = [cover_entry]
+
     print(f"بارگذاری و آماده‌سازی {len(chapters)} فصل…", flush=True)
     for num, path in chapters:
         a, e, _ = load_unit(path)
@@ -632,7 +649,9 @@ def build_book(r: Renderer, args, version_info: dict):
         pages = pages_pass2
     d2.close()
 
-    toc = [[1, "فهرست مطالب", 2]] + [[e[0], e[3], pages[i]] for i, e in enumerate(entries)]
+    toc = [[1, cover_title, 1], [1, "فهرست مطالب", 2]] + [
+        [e[0], e[3], pages[i]] for i, e in enumerate(entries[1:], 1)
+    ]
     out_file = PDF_DIR / "aima-4e-persian.pdf"
     n_pages = finalize(pdf2, out_file, TITLE_FA, toc)
     print(
