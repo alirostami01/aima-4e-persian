@@ -161,6 +161,11 @@ def css(page_size: str, font_pt: float) -> str:
   @bottom-center {{ content: counter(page, persian); font-family: 'VazirPDF'; font-size: 9pt; color: #666; }}
 }}
 @page cover {{ @bottom-center {{ content: none; }} }}
+@page bookcover {{
+  size: {page_size};
+  margin: 0;
+  @bottom-center {{ content: none; }}
+}}
 
 html {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
 body {{ margin: 0; font-family: 'VazirPDF', sans-serif; font-size: {font_pt}pt; line-height: 1.9; color: #1a1a1a; }}
@@ -245,6 +250,27 @@ section.support-project {{
 }}
 section.support-project h2 {{ border-right: 4pt solid #2c5f8a !important; background: transparent !important; }}
 
+/* روی جلد کتاب */
+.book-cover-image {{
+  page: bookcover;
+  width: 100vw;
+  height: 100vh;
+  margin: 0 !important;
+  padding: 0 !important;
+  break-after: page;
+  overflow: hidden;
+  background: #142b55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}}
+.book-cover-image img {{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}}
+
 /* صفحهٔ عنوان */
 .cover {{
   page: cover; height: 245mm; display: flex; flex-direction: column; justify-content: center;
@@ -296,6 +322,15 @@ section.support-project h2 {{ border-right: 4pt solid #2c5f8a !important; backgr
 # ───────────────────────────── HTML Assembly ─────────────────────────────
 def strip_tags(s: str) -> str:
     return re.sub(r"\s+", " ", htmllib.unescape(re.sub(r"<[^>]+>", "", s))).strip()
+
+
+def cover_image_html() -> str:
+    img_uri = (ROOT / "figures" / "aima-4e-persian.jpeg").as_uri()
+    return (
+        f'<div id="front-cover" class="book-cover-image">'
+        f'<img src="{img_uri}" alt="روی جلد کتاب">'
+        f'</div>'
+    )
 
 
 def cover_html(version_info: dict) -> str:
@@ -508,8 +543,10 @@ class Renderer:
 def get_toc_pages(doc, n_entries: int) -> list[int]:
     """استخراج شمارهٔ صفحات هدف پیوندهای فهرست از گذر نخست."""
     rows = []
-    for pno in range(1, doc.page_count):
+    for pno in range(doc.page_count):
         links = [l for l in doc[pno].get_links() if l.get("page", -1) >= 0]
+        if not links:
+            continue
         links.sort(key=lambda l: (round(l["from"].y0, 0), -l["from"].x1))
         for l in links:
             key = (pno, round(l["from"].y0))
@@ -589,9 +626,11 @@ def build_book(r: Renderer, args, version_info: dict):
     chapters = discover_chapters()
     arts, entries, chapter_of = [], [], {}
 
+    front_cover_title = "روی جلد"
+    front_cover_entry = (1, "front-cover", front_cover_title, front_cover_title, 0)
     cover_title = f"صفحهٔ اول: {TITLE_FA}"
     cover_entry = (1, "cover", cover_title, cover_title, 0)
-    entries = [cover_entry]
+    entries = [front_cover_entry, cover_entry]
 
     print(f"بارگذاری و آماده‌سازی {len(chapters)} فصل…", flush=True)
     for num, path in chapters:
@@ -601,7 +640,9 @@ def build_book(r: Renderer, args, version_info: dict):
         chapter_of[f"chapter-{num:02d}"] = num
 
     body_gen = lambda pages: (
-        cover_html(version_info)
+        cover_image_html()
+        + "\n"
+        + cover_html(version_info)
         + "\n"
         + toc_html(entries, chapter_of, pages)
         + "\n"
@@ -622,10 +663,21 @@ def build_book(r: Renderer, args, version_info: dict):
         # در صورت جابه‌جایی جزئی، با یک گذر دیگر همگام‌سازی می‌شود
         pdf2 = r.render(document(body_gen(pages_pass2), TITLE_FA, args), "book-pass3")
         pages = pages_pass2
+
+    # یافتن شمارهٔ صفحهٔ شروع فهرست مطالب برای نشانک PDF
+    toc_start = 3
+    for pno in range(d2.page_count):
+        if len(d2[pno].get_links()) >= 5:
+            toc_start = pno + 1
+            break
     d2.close()
 
-    toc = [[1, cover_title, 1], [1, "فهرست مطالب", 2]] + [
-        [e[0], e[3], pages[i]] for i, e in enumerate(entries[1:], 1)
+    toc = [
+        [1, "روی جلد", 1],
+        [1, cover_title, 2],
+        [1, "فهرست مطالب", toc_start],
+    ] + [
+        [e[0], e[3], pages[i]] for i, e in enumerate(entries[2:], 2)
     ]
     out_file = PDF_DIR / "aima-4e-persian.pdf"
     n_pages = finalize(pdf2, out_file, TITLE_FA, toc)

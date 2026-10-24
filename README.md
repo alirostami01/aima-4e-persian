@@ -16,6 +16,10 @@
 </p>
 
 <p align="center">
+  <img src="figures/aima-4e-persian.jpeg" alt="جلد کتاب هوش مصنوعی: یک رویکرد مدرن" width="340" />
+</p>
+
+<p align="center">
   <a href="https://github.com/alirostami01/aima-4e-persian">GitHub</a> ·
   <a href="https://github.com/alirostami01/aima-4e-persian/tree/main/markdown">Markdown</a> ·
   <a href="https://github.com/alirostami01/aima-4e-persian/tree/main/html">HTML</a> ·
